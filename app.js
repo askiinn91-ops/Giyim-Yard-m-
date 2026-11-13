@@ -197,6 +197,9 @@ function bindRoster(){
     if(row)row.classList.toggle('on',t.checked);
   };
   root.onclick=e=>{
+    // Liste her yeniden çizildiğinde düğme de yeniden oluştuğu için "hesapla" tıklaması burada yakalanır.
+    const calc=e.target.closest('[data-action="calculate"]');
+    if(calc){if(!calc.onclick)calculate();return}
     const open=e.target.closest('[data-person-open]');
     if(open)openPerson(open.dataset.personOpen);
   };
