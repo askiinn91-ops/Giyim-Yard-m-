@@ -60,3 +60,11 @@ Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip
 - Dağıtım listesindeki ikinci tablo kaldırıldı, yerine **genel toplam** satırı geldi; sayfa yatay üretilir.
 - Harcama talimatında sayı **1** olarak sabitlendi, birim **Sivaslı İlçe Millî Eğitim Müdürlüğü** olarak yazılır, açıklama başlığı kaldırıldı, imzacı bilgileri ortalandı.
 - Harcama talimatı ve dağıtım listesi artık **tek PDF** olarak kaydedilir.
+### 1.5.0
+
+- Sol menüye **Harcama Birimi** eklendi: birim adı, bütçe tertibi, gerekçe/hukuki dayanak ve üç imzacı (düzenleyen, gerçekleştirme görevlisi, harcama yetkilisi). "İmza ve Talimat Ayarları" menüsü kaldırıldı; bilgiler buradan yönetilir.
+- Harcama talimatındaki "Harcama Talebinde Bulunan Birim" artık bu menüdeki birim adından gelir.
+- Ödeme Dönemi: hesaplamadan sonra **"Bu ödemeyi kaydet"** düğmesi; kayıt belge listesine düşer. PDF üretimi belge listesindeki **PDF** düğmesiyle ayrı akışta yapılır.
+- Dağıtım listesinde imza sırası: solda **Onaylayan**, ortada **Kontrol Eden**, sağda **Düzenleyen**.
+- Dağıtım listesi artık doğrudan **yatay A4** olarak üretilir (HTML baskı yerine PDF çizimi).
+- İki belge tek PDF dosyasında birleştirilir.

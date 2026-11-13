@@ -45,6 +45,7 @@
       ],
       years: [{ year: 2026, incomeTax: '15', stampTax: '0,759' }],
       documentSettings: { editorName: 'Derya Düzenleyen', editorTitle: 'Şube Müdürü', proposedName: 'Kemal Kontrol', proposedTitle: 'Memur', authorityName: 'Oya Onay', authorityTitle: 'İlçe Müdürü', basis: 'Genelge dayanağı' },
+      spendingUnit: { name: 'Sivaslı İlçe Milli Eğitim Müdürlüğü', budget: '09.1.00.00', basis: 'Genelge dayanağı', editorName: 'Derya Düzenleyen', editorTitle: 'Şube Müdürü', proposedName: 'Kemal Kontrol', proposedTitle: 'Memur', authorityName: 'Oya Onay', authorityTitle: 'İlçe Müdürü' },
       batches: [{
         id: 'b1', year: 2026, institutionId: 'i1', date: '2026-11-13', number: '4821',
         details: [
@@ -71,7 +72,7 @@
     (async () => {
       const out = [];
       await wait(700);
-      for (const p of ['overview', 'institutions', 'staff', 'tariffs', 'payments', 'signers']) {
+      for (const p of ['overview', 'institutions', 'staff', 'tariffs', 'payments', 'spending']) {
         try {
           setPage(p);
           const h = document.querySelector('#page').innerHTML;
@@ -104,9 +105,12 @@
       } catch (e) { out.push('katalog=HATA(' + e.message + ')'); }
 
       try {
-        setPage('signers');
-        out.push('duzenleyen-alan=' + (document.querySelector('#cfgEditorName') ? 'VAR' : 'YOK'));
-      } catch (e) { out.push('duzenleyen-alan=HATA(' + e.message + ')'); }
+        setPage('spending');
+        out.push('harcama-birimi=' + (document.querySelector('#unitName') ? 'VAR' : 'YOK') + '/' + (document.querySelector('#unitBudget') ? 'VAR' : 'YOK') + '/' + (document.querySelector('#unitEditorName') ? 'VAR' : 'YOK'));
+        document.querySelector('#unitName').value = 'Test Birimi';
+        document.querySelector('#saveUnit').click(); await wait(40);
+        out.push('birim-kaydi=' + (window.__seed.spendingUnit && window.__seed.spendingUnit.name === 'Test Birimi' ? 'OK' : 'YOK'));
+      } catch (e) { out.push('harcama-birimi=HATA(' + e.message + ')'); }
 
       try {
         viewBatch('b1'); await wait(150);
@@ -121,9 +125,11 @@
         out.push('pdf-ozet-tablo=' + (area && area.querySelector('.summaryTable') ? 'VAR' : 'YOK'));
         out.push('pdf-toplam=' + (html.includes('GENEL TOPLAM') ? 'VAR' : 'YOK'));
         out.push('pdf-sayi=' + (html.includes('Sayı: 1') ? 'SABIT' : 'DEGISKEN'));
-        out.push('pdf-birim=' + (html.includes('Sivaslı İlçe Millî Eğitim Müdürlüğü') ? 'SABIT' : 'DEGISKEN'));
+        out.push('pdf-birim=' + (html.includes('Test Birimi') ? 'TEK-KAYNAK' : 'BULUNAMADI'));
         out.push('pdf-baslik=' + (html.includes('Aşağıda belirtilen personele ödenecek') ? 'KALDI' : 'KALDIRILDI'));
         out.push('pdf-ortalama=' + (area && area.querySelectorAll('.approvalGrid .val').length >= 6 ? 'VAR' : 'YOK'));
+        out.push('imza-sirasi=' + (area ? [...area.querySelectorAll('.distributionSignatures > div b')].map(x => x.textContent.trim()).join('>') : 'yok'));
+        out.push('birim-dinamik=' + (html.includes('Test Birimi') ? 'OK' : 'SABIT'));
         document.querySelector('#modal').close();
       } catch (e) { out.push('pdf=HATA(' + e.message + ')'); }
 

@@ -14,7 +14,7 @@
     <DebugSymbols>false</DebugSymbols>
     <AssemblyName>Giyim Yardımı</AssemblyName>
     <RootNamespace>GiyimYardimi</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <Product>Giyim Yardımı Yönetimi</Product>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
   </PropertyGroup>

@@ -127,3 +127,10 @@ h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
   #printArea .distributionTotal span{white-space:nowrap}
   #printArea .distributionTotal .grand{font:bold 9pt Arial,sans-serif;border-top:1px solid #222;padding-top:1mm}
 }
+/* v1.5.0: sayfa yönlerini CSS adlandırılmış sayfa ile belirle (WebView2 bu kuralı kullanıyor) */
+@page talimatSayfa{size:A4 portrait;margin:0}
+@page dagitimSayfa{size:A4 landscape;margin:0}
+@media print{
+  #printArea .instructionPage{page:talimatSayfa}
+  #printArea .distributionPage{page:dagitimSayfa}
+}

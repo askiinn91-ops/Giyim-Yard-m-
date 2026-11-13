@@ -17,11 +17,12 @@ namespace GiyimYardimi;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
+        var selfTest = args.Any(a => string.Equals(a, "--pdf-test", StringComparison.OrdinalIgnoreCase));
         // Aynı anda iki kopya açılırsa aynı veri dosyasına yazan iki sunucu olur; bunu engelle.
         using var singleInstance = new Mutex(true, @"Local\GiyimYardimi.TekKopya", out var isFirstInstance);
-        if (!isFirstInstance)
+        if (!isFirstInstance && !selfTest)
         {
             MessageBox.Show(
                 "Giyim Yardımı Yönetimi bu bilgisayarda zaten açık.\n\n"
@@ -40,7 +41,7 @@ internal static class Program
         server.Start();
         if (!string.IsNullOrEmpty(server.StartupNotice))
             MessageBox.Show(server.StartupNotice, "Giyim Yardımı Yönetimi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        Application.Run(new MainForm(server.Address, Path.Combine(dataRoot, "WebView2"), server.BackupRoot));
+        Application.Run(new MainForm(server.Address, Path.Combine(dataRoot, "WebView2"), server.BackupRoot, Path.Combine(dataRoot, "veriler.json"), selfTest));
     }
 }
 
@@ -50,12 +51,16 @@ internal sealed class MainForm : Form
     private readonly string _address;
     private readonly string _webViewData;
     private readonly string _backupRoot;
+    private readonly string _dataFile;
+    private readonly bool _selfTest;
 
-    public MainForm(string address, string webViewData, string backupRoot)
+    public MainForm(string address, string webViewData, string backupRoot, string dataFile, bool selfTest = false)
     {
         _address = address;
         _webViewData = webViewData;
         _backupRoot = backupRoot;
+        _dataFile = dataFile;
+        _selfTest = selfTest;
         Text = "Giyim Yardımı Yönetimi";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(900, 620);
@@ -83,6 +88,7 @@ internal sealed class MainForm : Form
                     _web.CoreWebView2.Navigate(uri.ToString());
             };
             _web.CoreWebView2.Navigate(_address);
+            if (_selfTest) await RunPdfSelfTestAsync();
         }
         catch (Exception ex)
         {
@@ -117,6 +123,7 @@ internal sealed class MainForm : Form
             if (type.GetString() != "exportPdf") return;
             var year = doc.RootElement.TryGetProperty("year", out var yearNode) && yearNode.TryGetInt32(out var y) ? y : DateTime.Now.Year;
             var institution = doc.RootElement.TryGetProperty("institution", out var institutionNode) ? institutionNode.GetString() ?? "Kurum" : "Kurum";
+            var batchId = doc.RootElement.TryGetProperty("batchId", out var batchNode) ? batchNode.GetString() ?? "" : "";
             var safeInstitution = new string(institution.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray()).Trim().TrimEnd('.');
             if (string.IsNullOrWhiteSpace(safeInstitution)) safeInstitution = "Kurum";
             var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Giyim Yardımı Çıktıları");
@@ -136,22 +143,17 @@ internal sealed class MainForm : Form
                 portrait.MediaSize = CoreWebView2PrintMediaSize.Custom;
                 portrait.PageWidth = 8.27;
                 portrait.PageHeight = 11.69;
-                portrait.MarginTop = portrait.MarginBottom = portrait.MarginLeft = portrait.MarginRight = 0;
                 portrait.Orientation = CoreWebView2PrintOrientation.Portrait;
-                if (!await _web.CoreWebView2.PrintToPdfAsync(talimatPath, portrait))
+                portrait.MarginTop = portrait.MarginBottom = portrait.MarginLeft = portrait.MarginRight = 0;
+                if (!await _web.CoreWebView2.PrintToPdfAsync(talimatPath))
                     throw new InvalidOperationException("Harcama talimatı PDF'si oluşturulamadı.");
 
-                await _web.CoreWebView2.ExecuteScriptAsync("document.body.dataset.exportPage='dagitim'");
-                var landscape = _web.CoreWebView2.Environment.CreatePrintSettings();
-                landscape.ShouldPrintBackgrounds = true;
-                landscape.ShouldPrintHeaderAndFooter = false;
-                landscape.MediaSize = CoreWebView2PrintMediaSize.Custom;
-                landscape.PageWidth = 11.69;
-                landscape.PageHeight = 8.27;
-                landscape.MarginTop = landscape.MarginBottom = landscape.MarginLeft = landscape.MarginRight = 0;
-                landscape.Orientation = CoreWebView2PrintOrientation.Landscape;
-                if (!await _web.CoreWebView2.PrintToPdfAsync(dagitimPath, landscape))
-                    throw new InvalidOperationException("Dağıtım listesi PDF'si oluşturulamadı.");
+                await _web.CoreWebView2.ExecuteScriptAsync("delete document.body.dataset.exportPage");
+                if (string.IsNullOrWhiteSpace(batchId))
+                    throw new InvalidOperationException("Ödeme kaydı bilgisi bulunamadı.");
+                if (!DistributionPdfWriter.TryCreate(dagitimPath, batchId, _dataFile, out var distributionError))
+                    throw new InvalidOperationException("Dağıtım listesi oluşturulamadı: " + distributionError);
+
 
                 PdfMerger.Merge(finalPath, talimatPath, dagitimPath);
                 try { File.Delete(talimatPath); } catch { }
@@ -170,6 +172,22 @@ internal sealed class MainForm : Form
             var callback = "window.pdfFailed&&window.pdfFailed(" + JsonSerializer.Serialize(ex.Message) + ")";
             try { await _web.CoreWebView2.ExecuteScriptAsync(callback); } catch { }
         }
+    }
+
+    /// <summary>Geliştirme doğrulaması: ilk ödeme belgesini açıp PDF üretimini çalıştırır, sonra kapanır.</summary>
+    private async Task RunPdfSelfTestAsync()
+    {
+        try
+        {
+            await Task.Delay(4000);
+            var idJson = await _web.CoreWebView2.ExecuteScriptAsync("db.batches[db.batches.length-1].id");
+            await _web.CoreWebView2.ExecuteScriptAsync("viewBatch(db.batches[db.batches.length-1].id)");
+            await Task.Delay(1500);
+            await HandleWebMessage($"{{\"type\":\"exportPdf\",\"year\":2026,\"institution\":\"Test\",\"batchId\":{idJson}}}");
+            await Task.Delay(3000);
+        }
+        catch { }
+        finally { BeginInvoke(new Action(Close)); }
     }
 
     private async Task ImportTariffPdfAsync()
