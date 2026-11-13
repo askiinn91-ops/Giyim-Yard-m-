@@ -1,7 +1,8 @@
-﻿*.exe
+*.exe
 publish/
 bin/
 obj/
+.build/
 node_modules/
 .env
 .env.*
@@ -11,3 +12,7 @@ node_modules/
 *.p12
 secrets.json
 credentials.json
+
+# Kullanıcıya ait yerel veri ve çalışma zamanı dosyaları
+veriler.json
+server.pid

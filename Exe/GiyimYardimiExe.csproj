@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <AssemblyName>Giyim Yardımı</AssemblyName>
+    <RootNamespace>GiyimYardimi</RootNamespace>
+    <Version>1.1.0</Version>
+    <Product>Giyim Yardımı Yönetimi</Product>
+    <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageReference Include="PdfPig" Version="0.1.16" />
+    <EmbeddedResource Include="..\index.html" LogicalName="GiyimYardimi.index.html" />
+    <EmbeddedResource Include="..\app.js" LogicalName="GiyimYardimi.app.js" />
+    <EmbeddedResource Include="..\styles.css" LogicalName="GiyimYardimi.styles.css" />
+    <EmbeddedResource Include="..\print.css" LogicalName="GiyimYardimi.print.css" />
+  </ItemGroup>
+</Project>
