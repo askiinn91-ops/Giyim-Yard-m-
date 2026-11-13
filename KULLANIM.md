@@ -39,3 +39,16 @@ Veri dosyası açılışta okunamazsa uygulama en son geçerli otomatik yedeği 
 
 Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip kapanır. Böylece iki pencerenin aynı veri dosyasına yazması engellenir.
 
+
+## Sürüm notları
+
+### 1.3.0
+
+- Kurumlar ve Personel Havuzu listelerine **Düzenle** düğmesi eklendi.
+- Açılan pencerelerde **Vazgeç** düğmesi artık uyarı vermeden kapatıyor.
+- Yıllık Fiyat Listesi sıkıştırıldı: sabit başlık, kaydırmalı liste ve **kalem arama** alanı.
+- Ödeme Dönemi'nde giyecek seçimi açılır listeye dönüştü; seçilen kişinin kalemleri ve toplamı ayrı tabloda görünüyor.
+- Kayıtlı ödeme listelerine **Güncelle** ve **Sil** düğmeleri eklendi.
+- İmza ve Talimat Ayarları'na **Düzenleyen** bilgisi eklendi.
+- Harcama Talimatı'nda açıklama metni kuruma göre otomatik yazılır; imza alanları ayarlardan doldurulur.
+- Dağıtım Listesi yatay A4 olarak, kişi adı tek satırda gruplanmış ve Düzenleyen · Kontrol Eden · Onaylayan imzalarıyla üretilir.

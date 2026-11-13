@@ -67,7 +67,7 @@ h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
   #printArea .peopleTable{width:100%;table-layout:fixed}
   #printArea .peopleTable th,#printArea .peopleTable td{font:8pt Arial,sans-serif;text-align:center;padding:2mm 1mm;border:1px solid #222}
   #printArea .peopleTable td:nth-child(5){text-align:center}
-  #printArea .peopleTable th:nth-child(1){width:9%}#printArea .peopleTable th:nth-child(2){width:18%}#printArea .peopleTable th:nth-child(3){width:15%}#printArea .peopleTable th:nth-child(4){width:17%}#printArea .peopleTable th:nth-child(5){width:27%}#printArea .peopleTable th:nth-child(6){width:14%}
+  #printArea .peopleTable th:nth-child(1){width:7%}#printArea .peopleTable th:nth-child(2){width:18%}#printArea .peopleTable th:nth-child(3){width:15%}#printArea .peopleTable th:nth-child(4){width:13%}#printArea .peopleTable th:nth-child(5){width:23%}#printArea .peopleTable th:nth-child(6){width:15%}#printArea .peopleTable th:nth-child(7){width:9%}#printArea .peopleTable td[rowspan]{vertical-align:middle}
   #printArea .summaryTable{width:76%;margin-top:8mm;table-layout:fixed}
   #printArea .summaryTable th,#printArea .summaryTable td{font:8pt Arial,sans-serif;text-align:center;padding:2mm 1mm;border:1px solid #222}
   #printArea .summaryTable .grandTotal th{text-align:center}
@@ -106,4 +106,15 @@ h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
   #printArea .summaryTable{width:68%;table-layout:fixed;margin:7mm 0 0}
   #printArea .summaryTable th,#printArea .summaryTable td{font:8pt Arial,sans-serif;padding:2mm 1.5mm;border:1px solid #111;text-align:center}
   #printArea .distributionSignatures{padding:0 8mm 2mm;font:8pt Arial,sans-serif}
+}
+
+/* Dağıtım listesi: yatay A4, kişi bazlı satır birleştirme ve üç imza bloğu (v1.3.0) */
+@media print{
+  body[data-export-page="dagitim"] #printArea .distributionPage{width:277mm;height:auto;min-height:190mm;margin:0;padding:8mm 10mm;box-sizing:border-box;border:0;overflow:visible;display:flex;flex-direction:column}
+  body[data-export-page="dagitim"] #printArea .distributionPage>h2{font:bold 11pt Arial,sans-serif;margin:0 0 5mm;text-align:left}
+  body[data-export-page="dagitim"] #printArea .distributionDate{margin-bottom:4mm}
+  #printArea .distributionSignatures{display:flex;justify-content:space-between;gap:6mm;margin-top:auto;padding:0 4mm 2mm;font:8pt Arial,sans-serif;text-align:center}
+  #printArea .distributionSignatures>div{flex:1}
+  #printArea .distributionSignatures b{display:block;font:bold 8pt Arial,sans-serif;margin-bottom:14mm;letter-spacing:.3px}
+  #printArea .distributionSignatures span{display:block;font:8pt Arial,sans-serif;min-height:4.5mm}
 }

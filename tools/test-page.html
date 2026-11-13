@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>TEST-BASLAMADI</title>
+  <link rel="stylesheet" href="../styles.css">
+  <link rel="stylesheet" href="../print.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brandmark">GY</div><div><b>Giyim Yardımı</b><small>Personel ve ödeme yönetimi</small></div></div>
+    <nav id="nav">
+      <button class="nav active" data-page="overview">◫ <span>Genel Bakış</span></button>
+      <button class="nav" data-page="institutions">▦ <span>Kurumlar</span></button>
+      <button class="nav" data-page="staff">♙ <span>Personel Havuzu</span></button>
+      <button class="nav" data-page="signers">✎ <span>İmza ve Talimat Ayarları</span></button>
+      <button class="nav" data-page="tariffs">₺ <span>Yıllık Fiyat Listesi</span></button>
+      <button class="nav" data-page="payments">▤ <span>Ödeme Dönemi</span></button>
+    </nav>
+    <div class="sidefoot"><span class="dot"></span> Yerel bilgisayarda çalışıyor <small>Veriler bu program klasöründe saklanır.</small></div>
+  </aside>
+  <main>
+    <header><div><div class="eyebrow">İLÇE MİLLÎ EĞİTİM MÜDÜRLÜĞÜ</div><h1 id="pageTitle">Genel Bakış</h1></div><div class="year-chip" id="yearBadge">YIL · 2026</div></header>
+    <section id="page"></section>
+  </main>
+  <dialog id="modal"><form method="dialog" id="modalForm"><button class="x" value="cancel" formnovalidate aria-label="Kapat">×</button><div id="modalBody"></div></form></dialog>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    window.__errors = [];
+    window.addEventListener('error', e => window.__errors.push('JS:' + (e.message || e)));
+    window.__seed = {
+      institutions: [
+        { id: 'i1', name: 'Deneme İlkokulu', type: 'Okul' },
+        { id: 'i2', name: 'Deneme Ortaokulu', type: 'Okul' }
+      ],
+      staff: [
+        { id: 's1', name: 'Ali Veli', institutionId: 'i1', title: 'Hizmetli', serviceClass: 'Yardımcı Hizmetler', active: true, nationalId: '12345678901' },
+        { id: 's2', name: 'Ayşe Yılmaz', institutionId: 'i1', title: 'Şoför', serviceClass: 'Yardımcı Hizmetler', active: true, nationalId: '' }
+      ],
+      tariffs: [
+        { id: 't1', year: 2026, title: 'Hizmetli', serviceClass: 'Yardımcı Hizmetler', item: 'Ayakkabı', mode: 'Nakdi', amount: 320.98, years: 1 },
+        { id: 't2', year: 2026, title: 'Şoför', serviceClass: 'Yardımcı Hizmetler', item: 'Gömlek', mode: 'Ayni', amount: 150, years: 2 },
+        { id: 't3', year: 2026, title: 'Hizmetli', serviceClass: 'Yardımcı Hizmetler', item: 'Gömlek', mode: 'Nakdi', amount: 150, years: 2 }
+      ],
+      years: [{ year: 2026, incomeTax: '15', stampTax: '0,759' }],
+      documentSettings: { editorName: 'Derya Düzenleyen', editorTitle: 'Şube Müdürü', proposedName: 'Kemal Kontrol', proposedTitle: 'Memur', authorityName: 'Oya Onay', authorityTitle: 'İlçe Müdürü', basis: 'Genelge dayanağı' },
+      batches: [{
+        id: 'b1', year: 2026, institutionId: 'i1', date: '2026-11-13', number: '4821',
+        details: [
+          { staffId: 's1', staffName: 'Ali Veli', title: 'Hizmetli', item: 'Ayakkabı', mode: 'Nakdi', amount: 320.98, quantity: 1, year: 2026, paid: true },
+          { staffId: 's1', staffName: 'Ali Veli', title: 'Hizmetli', item: 'Gömlek', mode: 'Nakdi', amount: 300, quantity: 2, year: 2026, paid: true },
+          { staffId: 's2', staffName: 'Ayşe Yılmaz', title: 'Şoför', item: 'Gömlek', mode: 'Ayni', amount: 150, quantity: 1, year: 2026, paid: true }
+        ],
+        totalGross: 770.98, totalNet: 770.98, totalAyni: 150,
+        harcama: { unit: 'Deneme İlkokulu', basis: 'Genelge dayanağı', subject: '2026 yılı giyecek yardımı', quantity: '2 kişi', period: '2026', method: 'Karışık', amount: 770.98, appropriation: 770.98, budget: '', officers: '', authority: '' }
+      }]
+    };
+    window.fetch = async (url, opts) => {
+      const u = String(url);
+      if (u.indexOf('/api/data') >= 0) {
+        if (opts && String(opts.method || 'GET').toUpperCase() === 'POST') return { ok: true, json: async () => ({ saved: true }) };
+        return { ok: true, json: async () => window.__seed };
+      }
+      return { ok: true, json: async () => ({}) };
+    };
+  </script>
+  <script src="../app.js"></script>
+  <script>
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    (async () => {
+      const out = [];
+      await wait(700);
+      for (const p of ['overview', 'institutions', 'staff', 'tariffs', 'payments', 'signers']) {
+        try {
+          setPage(p);
+          const h = document.querySelector('#page').innerHTML;
+          out.push(p + '=' + (h.length > 50 ? 'OK' : 'BOS(' + h.length + ')'));
+        } catch (e) { out.push(p + '=HATA(' + e.message + ')'); }
+      }
+
+      try {
+        setPage('institutions'); action('add-inst'); await wait(60);
+        const d = document.querySelector('#modal');
+        const opened = d.open;
+        d.querySelector('.dialog-actions .secondary').click(); await wait(60);
+        out.push('vazgec=' + (opened ? 'acildi+' : 'ACILMADI+') + (d.open ? 'KAPANMADI' : 'KAPANDI'));
+      } catch (e) { out.push('vazgec=HATA(' + e.message + ')'); }
+
+      setPage('institutions');
+      out.push('edit-kurum=' + (document.querySelector('[data-action="edit-inst"]') ? 'VAR' : 'YOK'));
+      setPage('staff');
+      out.push('edit-personel=' + (document.querySelector('[data-action="edit-staff"]') ? 'VAR' : 'YOK'));
+
+      try {
+        setPage('tariffs');
+        const tbl = document.querySelector('.catalog-table');
+        out.push('katalog=' + (tbl ? 'VAR:' + tbl.querySelectorAll('tbody tr').length + 'satir' : 'YOK'));
+      } catch (e) { out.push('katalog=HATA(' + e.message + ')'); }
+
+      try {
+        setPage('signers');
+        out.push('duzenleyen-alan=' + (document.querySelector('#cfgEditorName') ? 'VAR' : 'YOK'));
+      } catch (e) { out.push('duzenleyen-alan=HATA(' + e.message + ')'); }
+
+      try {
+        viewBatch('b1'); await wait(150);
+        const area = document.querySelector('#printArea');
+        const html = area ? area.innerHTML : '';
+        const ths = area ? [...area.querySelectorAll('.peopleTable thead th')].map(x => x.textContent.trim()) : [];
+        out.push('pdf-kolon=' + ths.length + '(' + ths.join('/') + ')');
+        out.push('pdf-rowspan=' + (area ? area.querySelectorAll('.peopleTable td[rowspan]').length : -1));
+        out.push('pdf-imzalar=' + (html.includes('Derya Düzenleyen') && html.includes('Kemal Kontrol') && html.includes('Oya Onay') ? 'DOLU' : 'BOS'));
+        out.push('pdf-aciklama=' + (html.includes('bünyesinde görev yapan') ? 'VAR' : 'YOK'));
+        out.push('pdf-talimat-imza=' + (html.includes('Teklif Eden Yetkilinin') && html.includes('O L U R') ? 'VAR' : 'YOK'));
+        document.querySelector('#modal').close();
+      } catch (e) { out.push('pdf=HATA(' + e.message + ')'); }
+
+      try {
+        setPage('tariffs');
+        const cs = document.querySelector('#catalogSearch');
+        cs.value = 'gömlek'; cs.oninput(); await wait(30);
+        const vis = [...document.querySelectorAll('#catalogTable tbody tr')].filter(r => !r.hidden).length;
+        out.push('katalog-arama=' + vis);
+      } catch (e) { out.push('katalog-arama=HATA(' + e.message + ')'); }
+
+      try {
+        selectedInstitution = 'i1';
+        setPage('payments'); await wait(60);
+        const chk0 = document.querySelector('[data-person-check]');
+        chk0.checked = true; chk0.dispatchEvent(new Event('change', { bubbles: true })); await wait(60);
+        const pick = document.querySelector('[data-pick-item]');
+        out.push('odeme-secim=' + (pick ? 'VAR' : 'YOK'));
+        const card = pick.closest('.person-card');
+        pick.value = 'Ayakkabı';
+        card.querySelector('[data-pick-mode]').value = 'Nakdi';
+        card.querySelector('[data-pick-qty]').value = '2';
+        card.querySelector('[data-pick-add]').click();
+        await wait(60);
+        const rows = card.querySelectorAll('.picked-table tbody tr').length;
+        const total = card.querySelector('.person-total') ? card.querySelector('.person-total').textContent : '';
+        out.push('odeme-ekle=' + rows + 'satir,' + (total.includes('641,96') ? 'TOPLAM-DOGRU' : 'toplam:' + total.trim()));
+      } catch (e) { out.push('odeme=HATA(' + e.message + ')'); }
+
+      try {
+        setPage('payments'); await wait(30);
+        out.push('liste-buton=' + (document.querySelector('[data-action="edit-batch"]') ? 'VAR' : 'YOK') + '/' + (document.querySelector('[data-action="del-batch"]') ? 'VAR' : 'YOK'));
+        action('edit-batch', 'b1'); await wait(60);
+        const inp = document.querySelector('input[name="editorName"]');
+        out.push('guncelle-form=' + (inp && inp.value === 'Derya Düzenleyen' ? 'DOLU' : 'BOS'));
+        document.querySelector('#modal').close();
+      } catch (e) { out.push('liste-buton=HATA(' + e.message + ')'); }
+
+      out.push('jshata=' + (window.__errors.length ? window.__errors.join(';') : 'yok'));
+      document.title = 'TEST|' + out.join('|');
+    })();
+  </script>
+</body>
+</html>
