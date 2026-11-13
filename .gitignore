@@ -1,0 +1,13 @@
+﻿*.exe
+publish/
+bin/
+obj/
+node_modules/
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*.p12
+secrets.json
+credentials.json

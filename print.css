@@ -1,0 +1,109 @@
+/* Local, offline font fallbacks and print layout for the generated documents. */
+body{font-family:"Segoe UI",Arial,sans-serif}
+h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
+.toolbar select,.person-table select,.person-table input{border:1px solid #dce3dd;border-radius:6px;background:#fff;padding:6px 8px;color:#17251f}
+.toolbar select{min-height:36px;min-width:130px}
+.person-list{display:grid;gap:10px}
+.person-card{border:1px solid #e4e9e5;border-radius:10px;background:#fff;overflow:hidden}
+.person-top{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer}
+.person-top>input{width:17px;height:17px;accent-color:#197454}
+.person-name{font-weight:700;min-width:180px}
+.person-class{color:#748179;font-size:12px;margin-left:auto}
+.person-panel{border-top:1px solid #e4e9e5;padding:14px 16px}
+.person-items{max-height:440px;overflow:auto}
+.chooser-title{font-size:12px;font-weight:700;margin:0 0 10px;color:#34453b}
+.person-table{min-width:760px}
+.person-table th{position:sticky;top:0;z-index:1}
+.person-table td:first-child,.person-table th:first-child{text-align:center;width:46px}
+.person-table input[type=checkbox]{width:16px;height:16px;accent-color:#197454}
+.person-table input[type=number]{width:72px}
+.catalog-table{min-width:760px}
+.person-card .badge{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@page{size:A4 portrait;margin:10mm}
+@media print{
+  body>*{visibility:hidden!important}
+  dialog#modal[open],dialog#modal[open] *{visibility:visible!important}
+  dialog#modal[open]{position:absolute;inset:0;width:100%;max-width:none;height:auto;border-radius:0;box-shadow:none;margin:0;padding:0}
+  dialog#modal[open] .x,dialog#modal[open] .dialog-actions,dialog#modal[open] .actions,dialog#modal[open] .tabs,dialog#modal[open] .callout{display:none!important}
+  #printArea .printPage{page-break-after:always;break-after:page;padding:10mm}
+  #printArea .printPage:last-child{page-break-after:auto;break-after:auto}
+  #printArea h2{font:700 16px Arial,sans-serif;margin:0 0 7px;text-align:center}
+  #printArea p{font:11px Arial,sans-serif;margin:0 0 12px;text-align:center}
+  .reporttable{width:100%;border-collapse:collapse;min-width:0}
+  .reporttable th,.reporttable td{border:1px solid #777;padding:6px;font:10px Arial,sans-serif;text-align:left;white-space:normal}
+  .reporttable thead th{background:#eee;color:#111}
+  .reporttable tbody th{width:35%;text-transform:none;letter-spacing:0;color:#111;background:#f8f8f8}
+  .reporttotal{text-align:right;font-weight:bold;margin-top:10px}
+}
+#modal[open]{max-height:94vh;overflow:auto}
+#modal .field textarea{width:100%;box-sizing:border-box;border:1px solid #dce3dd;border-radius:6px;padding:9px;font:inherit;resize:vertical}
+@page{size:A4 portrait;margin:0}
+@media print{
+  dialog#modal[open] #modalBody>h2,dialog#modal[open] #modalBody>.dialog-sub{display:none!important}
+  dialog#modal[open]{max-height:none;overflow:visible}
+  #printArea .printPage{width:190mm;height:277mm;min-height:277mm;margin:0 auto;padding:6mm 8mm;box-sizing:border-box;border:1px solid #222;position:relative;display:flex;flex-direction:column;page-break-after:always;break-after:page;overflow:hidden}
+  #printArea .printPage:last-child{page-break-after:auto;break-after:auto}
+  #printArea .instructionPage>h2{font:bold 11pt Arial,sans-serif;text-align:center;margin:2mm 0}
+  #printArea .instructionTop{height:8mm;flex:none;border:1px solid #222;display:flex;justify-content:space-between;align-items:center;padding:0 6mm;font:8pt Arial,sans-serif}
+  #printArea .requestUnit{height:10mm;flex:none;border:1px solid #222;border-top:0;display:grid;grid-template-columns:45% 55%;align-items:center;padding:0 6mm;font:8pt Arial,sans-serif}
+  #printArea .reasonTable{display:grid;grid-template-columns:7mm 1fr;border:1px solid #222;border-top:0;min-height:0;flex:none}
+  #printArea .verticalLabel{writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font:bold 8pt Arial,sans-serif;letter-spacing:1px;border-right:1px solid #222;padding:2mm}
+  #printArea .reasonTable .reporttable{height:100%}
+  #printArea .reasonTable .reporttable th,#printArea .reasonTable .reporttable td{font:7pt Arial,sans-serif;padding:.55mm 1.5mm;border:1px solid #555}
+  #printArea .reasonTable .reporttable th{width:36%;font-weight:normal;background:#fff}
+  #printArea .explanation{height:57mm;min-height:57mm;flex:none;border:1px solid #222;border-top:0;padding:3mm 0 1mm;display:flex;flex-direction:column;font:7.5pt Arial,sans-serif}
+  #printArea .explanation>b{color:#c00;font-weight:normal}
+  #printArea .explanationTitle{min-height:5mm;padding-top:1mm}
+  #printArea .explanationBox{border:1px solid #555;margin:0 8mm;flex:1;padding:7mm;text-align:center;white-space:pre-wrap}
+  #printArea .approval{margin-top:auto;flex:none;border:1px solid #222;text-align:center;padding-top:1mm;font:7pt Arial,sans-serif}
+  #printArea .approvalGrid{display:grid;grid-template-columns:1fr 1fr;margin-top:1mm;text-align:left;min-height:15mm}
+  #printArea .approvalGrid>div{border:1px solid #555;padding:1mm;font:6.5pt Arial,sans-serif}
+  #printArea .approvalGrid>div+div{text-align:center}
+  #printArea .approvalGrid p{margin:.5mm 0;text-align:left;font:6.5pt Arial,sans-serif}
+  #printArea .approvalGrid .signHead{text-align:center;margin-bottom:3mm}
+  #printArea .distributionPage{padding:14mm 12mm}
+  #printArea .distributionDate{text-align:right;font:9pt Arial,sans-serif;margin-bottom:8mm}
+  #printArea .distributionPage>h2{text-align:left;font:bold 10pt Arial,sans-serif;letter-spacing:.2px;margin:0 0 7mm}
+  #printArea .peopleTable{width:100%;table-layout:fixed}
+  #printArea .peopleTable th,#printArea .peopleTable td{font:8pt Arial,sans-serif;text-align:center;padding:2mm 1mm;border:1px solid #222}
+  #printArea .peopleTable td:nth-child(5){text-align:center}
+  #printArea .peopleTable th:nth-child(1){width:9%}#printArea .peopleTable th:nth-child(2){width:18%}#printArea .peopleTable th:nth-child(3){width:15%}#printArea .peopleTable th:nth-child(4){width:17%}#printArea .peopleTable th:nth-child(5){width:27%}#printArea .peopleTable th:nth-child(6){width:14%}
+  #printArea .summaryTable{width:76%;margin-top:8mm;table-layout:fixed}
+  #printArea .summaryTable th,#printArea .summaryTable td{font:8pt Arial,sans-serif;text-align:center;padding:2mm 1mm;border:1px solid #222}
+  #printArea .summaryTable .grandTotal th{text-align:center}
+  #printArea .distributionSignatures{display:flex;justify-content:space-between;margin-top:auto;padding:0 8mm 2mm;font:8pt Arial,sans-serif;text-align:center}
+}
+@page{size:A4;margin:0}
+@media print{
+  body[data-export-page="talimat"] .distributionPage{display:none!important}
+  body[data-export-page="dagitim"] .instructionPage{display:none!important}
+  body[data-export-page] #printArea .printPage{page-break-after:auto!important;break-after:auto!important}
+  dialog#modal[open]{position:absolute;inset:0;width:100%;height:auto;max-height:none;margin:0;padding:0;border:0;border-radius:0;overflow:visible;box-shadow:none;background:#fff}
+  dialog#modal[open] #modalBody>h2,dialog#modal[open] #modalBody>.dialog-sub{display:none!important}
+  #printArea{margin:0;padding:0}
+  #printArea .instructionPage{width:190mm;height:277mm;min-height:277mm;margin:0 auto;padding:0;border:0;overflow:hidden;display:block;box-sizing:border-box}
+  #printArea .instructionPage>h2{font:bold 12pt Arial,sans-serif;text-align:center;margin:25mm 0 2mm;padding:0}
+  #printArea .instructionFrame{height:188mm;width:100%;box-sizing:border-box;border:1px solid #111;display:flex;flex-direction:column;overflow:hidden;font:8pt Arial,sans-serif}
+  #printArea .instructionTop{height:9mm;flex:none;border:0;border-bottom:1px solid #111;padding:0 7mm;font:8pt Arial,sans-serif}
+  #printArea .requestUnit{height:14mm;flex:none;border:0;border-bottom:1px solid #111;padding:0 7mm;font:8pt Arial,sans-serif}
+  #printArea .reasonTable{height:69mm;min-height:69mm;flex:none;border:0;border-bottom:1px solid #111;grid-template-columns:8mm 1fr}
+  #printArea .reasonTable .reporttable th,#printArea .reasonTable .reporttable td{font:7.5pt Arial,sans-serif;padding:.8mm 1.5mm}
+  #printArea .reasonTable .reporttable th{width:35%}
+  #printArea .explanation{height:66mm;min-height:66mm;flex:none;border:0;border-bottom:1px solid #111;padding:3mm 0 1mm;font:8pt Arial,sans-serif}
+  #printArea .explanation>b{text-decoration:underline;font-weight:bold}
+  #printArea .explanationTitle{min-height:6mm;padding:1mm 0}
+  #printArea .explanationBox{margin:0 8mm;padding:5mm;font:8pt Arial,sans-serif}
+  #printArea .approval{height:30mm;min-height:30mm;box-sizing:border-box;flex:none;margin:0;padding:1mm 0 0;border:0;font:7.5pt Arial,sans-serif}
+  #printArea .approvalGrid{height:23mm;min-height:23mm;margin:1mm 0 0}
+  #printArea .approvalGrid>div{padding:1mm 2mm;font:7pt Arial,sans-serif}
+  #printArea .approvalGrid p{font:7pt Arial,sans-serif;margin:.5mm 0}
+  #printArea .distributionPage{width:277mm;height:190mm;min-height:190mm;margin:0 auto;padding:10mm 12mm;box-sizing:border-box;border:1px solid #111;overflow:hidden;display:flex;flex-direction:column}
+  #printArea .distributionDate{font:8pt Arial,sans-serif;margin-bottom:7mm}
+  #printArea .distributionPage>h2{font:bold 10pt Arial,sans-serif;margin:0 0 7mm;text-align:left}
+  #printArea .peopleTable{table-layout:fixed;width:100%;margin:0}
+  #printArea .peopleTable th,#printArea .peopleTable td{font:8pt Arial,sans-serif;padding:2mm 1.5mm;border:1px solid #111}
+  #printArea .peopleTable th:nth-child(1){width:9%}#printArea .peopleTable th:nth-child(2){width:19%}#printArea .peopleTable th:nth-child(3){width:15%}#printArea .peopleTable th:nth-child(4){width:17%}#printArea .peopleTable th:nth-child(5){width:26%}#printArea .peopleTable th:nth-child(6){width:14%}
+  #printArea .summaryTable{width:68%;table-layout:fixed;margin:7mm 0 0}
+  #printArea .summaryTable th,#printArea .summaryTable td{font:8pt Arial,sans-serif;padding:2mm 1.5mm;border:1px solid #111;text-align:center}
+  #printArea .distributionSignatures{padding:0 8mm 2mm;font:8pt Arial,sans-serif}
+}
