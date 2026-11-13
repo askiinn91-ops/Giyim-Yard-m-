@@ -89,6 +89,7 @@
 
       setPage('institutions');
       out.push('edit-kurum=' + (document.querySelector('[data-action="edit-inst"]') ? 'VAR' : 'YOK'));
+      out.push('istatistik=' + document.querySelectorAll('.statline').length);
       setPage('staff');
       out.push('edit-personel=' + (document.querySelector('[data-action="edit-staff"]') ? 'VAR' : 'YOK'));
 
@@ -96,6 +97,10 @@
         setPage('tariffs');
         const tbl = document.querySelector('.catalog-table');
         out.push('katalog=' + (tbl ? 'VAR:' + tbl.querySelectorAll('tbody tr').length + 'satir' : 'YOK'));
+        const pageHtml = document.querySelector('#page').innerHTML;
+        out.push('kullanim-sutunu=' + (pageHtml.includes('Kullanım süresi') ? 'VAR' : 'YOK'));
+        out.push('yedek-buton=' + (document.querySelector('[data-action="backup"]') ? 'VAR' : 'YOK'));
+        out.push('ekle-buton=' + (document.querySelector('[data-action="add-tariff"]') ? 'VAR' : 'YOK'));
       } catch (e) { out.push('katalog=HATA(' + e.message + ')'); }
 
       try {
@@ -113,6 +118,12 @@
         out.push('pdf-imzalar=' + (html.includes('Derya Düzenleyen') && html.includes('Kemal Kontrol') && html.includes('Oya Onay') ? 'DOLU' : 'BOS'));
         out.push('pdf-aciklama=' + (html.includes('bünyesinde görev yapan') ? 'VAR' : 'YOK'));
         out.push('pdf-talimat-imza=' + (html.includes('Teklif Eden Yetkilinin') && html.includes('O L U R') ? 'VAR' : 'YOK'));
+        out.push('pdf-ozet-tablo=' + (area && area.querySelector('.summaryTable') ? 'VAR' : 'YOK'));
+        out.push('pdf-toplam=' + (html.includes('GENEL TOPLAM') ? 'VAR' : 'YOK'));
+        out.push('pdf-sayi=' + (html.includes('Sayı: 1') ? 'SABIT' : 'DEGISKEN'));
+        out.push('pdf-birim=' + (html.includes('Sivaslı İlçe Millî Eğitim Müdürlüğü') ? 'SABIT' : 'DEGISKEN'));
+        out.push('pdf-baslik=' + (html.includes('Aşağıda belirtilen personele ödenecek') ? 'KALDI' : 'KALDIRILDI'));
+        out.push('pdf-ortalama=' + (area && area.querySelectorAll('.approvalGrid .val').length >= 6 ? 'VAR' : 'YOK'));
         document.querySelector('#modal').close();
       } catch (e) { out.push('pdf=HATA(' + e.message + ')'); }
 
@@ -128,18 +139,24 @@
         selectedInstitution = 'i1';
         setPage('payments'); await wait(60);
         const chk0 = document.querySelector('[data-person-check]');
-        chk0.checked = true; chk0.dispatchEvent(new Event('change', { bubbles: true })); await wait(60);
-        const pick = document.querySelector('[data-pick-item]');
-        out.push('odeme-secim=' + (pick ? 'VAR' : 'YOK'));
-        const card = pick.closest('.person-card');
+        chk0.checked = true; chk0.dispatchEvent(new Event('change', { bubbles: true })); await wait(40);
+        out.push('kutucuk-panel=' + (document.querySelector('.person-panel') ? 'ACILDI' : 'YOK'));
+        const openBtn = document.querySelector('[data-person-open]');
+        out.push('odeme-satir=' + (openBtn ? 'VAR' : 'YOK'));
+        openBtn.click(); await wait(80);
+        const pick = document.querySelector('#personPanel [data-pick-item]');
+        out.push('odeme-pencere=' + (pick ? 'VAR' : 'YOK'));
         pick.value = 'Ayakkabı';
-        card.querySelector('[data-pick-mode]').value = 'Nakdi';
-        card.querySelector('[data-pick-qty]').value = '2';
-        card.querySelector('[data-pick-add]').click();
+        document.querySelector('#personPanel [data-pick-mode]').value = 'Nakdi';
+        document.querySelector('#personPanel [data-pick-qty]').value = '2';
+        document.querySelector('#personPanel [data-pick-add]').click();
         await wait(60);
-        const rows = card.querySelectorAll('.picked-table tbody tr').length;
-        const total = card.querySelector('.person-total') ? card.querySelector('.person-total').textContent : '';
+        const rows = document.querySelectorAll('#personPanel .picked-table tbody tr').length;
+        const total = document.querySelector('#personPanel .person-total') ? document.querySelector('#personPanel .person-total').textContent : '';
         out.push('odeme-ekle=' + rows + 'satir,' + (total.includes('641,96') ? 'TOPLAM-DOGRU' : 'toplam:' + total.trim()));
+        document.querySelector('#modal').close(); await wait(80);
+        const sum = document.querySelector('.person-sum');
+        out.push('odeme-ozet=' + (sum && sum.textContent.includes('641,96') ? 'GUNCELLENDI' : 'ESKI'));
       } catch (e) { out.push('odeme=HATA(' + e.message + ')'); }
 
       try {

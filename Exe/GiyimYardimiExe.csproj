@@ -14,13 +14,14 @@
     <DebugSymbols>false</DebugSymbols>
     <AssemblyName>Giyim Yardımı</AssemblyName>
     <RootNamespace>GiyimYardimi</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.4.0</Version>
     <Product>Giyim Yardımı Yönetimi</Product>
     <RestoreConfigFile>$(MSBuildThisFileDirectory)NuGet.Config</RestoreConfigFile>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <PackageReference Include="PdfPig" Version="0.1.16" />
+    <PackageReference Include="PdfSharpCore" Version="1.3.65" />
     <EmbeddedResource Include="..\index.html" LogicalName="GiyimYardimi.index.html" />
     <EmbeddedResource Include="..\app.js" LogicalName="GiyimYardimi.app.js" />
     <EmbeddedResource Include="..\styles.css" LogicalName="GiyimYardimi.styles.css" />

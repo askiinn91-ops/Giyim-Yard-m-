@@ -1,6 +1,7 @@
 param(
     [string]$Configuration = 'Release',
-    [string]$PackagesPath = (Join-Path $PSScriptRoot '.build/packages')
+    # Paket onbellegi kisa bir yolda tutulur; derin klasorlerde Windows'un 260 karakter sinirina takilir.
+    [string]$PackagesPath = (Join-Path $env:LOCALAPPDATA 'GiyimYardimi\packages')
 )
 
 $ErrorActionPreference = 'Stop'

@@ -17,7 +17,51 @@ function nav(){ $$('.nav').forEach(b=>b.addEventListener('click',()=>setPage(b.d
 const instName = x => db.institutions.find(i=>i.id===x)?.name||'Kurum seçilmemiş';
 // [temizlendi] eski render() tanimi
 function overview(){let count=db.staff.filter(s=>s.active!==false).length, activeInst=db.institutions.length, t=db.tariffs.filter(x=>Number(x.year)===Number(activeYear)).length, batches=db.batches.filter(x=>Number(x.year)===Number(activeYear));let total=batches.reduce((a,b)=>a+(b.totalNet||0),0);return `<div class="hero"><h2>Giyecek yardımı işlemleriniz tek yerde.</h2><p>Personel havuzunu yönetin, ilgili yılın tarifesini tanımlayın ve kurum seçerek ayni/nakdi ödeme listelerini hazırlayın.</p></div><div class="stats"><div class="stat"><div class="label">KAYITLI AKTİF PERSONEL</div><strong>${count}</strong><em>Tüm bağlı kurumlar</em></div><div class="stat"><div class="label">KAYITLI KURUM</div><strong>${activeInst}</strong><em>İlçe müdürlüğü ve okullar</em></div><div class="stat"><div class="label">${activeYear} TARİFE KALEMİ</div><strong>${t}</strong><em>Unvan ve giyecek tanımları</em></div><div class="stat"><div class="label">${activeYear} HAZIRLANAN ÖDEME</div><strong>${money(total)}</strong><em>${batches.length} ödeme listesi</em></div></div><div class="grid2"><div class="card"><div class="cardhead"><div><h2>Hızlı başlangıç</h2><p>İlk kullanımda şu sırayı izleyin</p></div></div><div class="tablewrap"><table><thead><tr><th>Adım</th><th>İşlem</th><th>Durum</th></tr></thead><tbody><tr><td>01</td><td>Kurumları tanımlayın</td><td>${db.institutions.length?'<span class="badge">Hazır</span>':'<span class="badge amber">Bekliyor</span>'}</td></tr><tr><td>02</td><td>Personel havuzunu oluşturun</td><td>${count?'<span class="badge">Hazır</span>':'<span class="badge amber">Bekliyor</span>'}</td></tr><tr><td>03</td><td>${activeYear} tarife kalemlerini girin</td><td>${t?'<span class="badge">Hazır</span>':'<span class="badge amber">Bekliyor</span>'}</td></tr><tr><td>04</td><td>Kurum ve ödeme dönemini seçin</td><td>${batches.length?'<span class="badge">Hazır</span>':'<span class="badge amber">Bekliyor</span>'}</td></tr></tbody></table></div></div><div class="card"><div class="cardhead"><div><h2>Son hazırlanan listeler</h2><p>Ödeme dönemi kayıtları</p></div><button class="btn secondary" data-goto="payments">Tümünü gör</button></div>${batches.length?tableBatches(batches.slice().reverse().slice(0,4)):'<div class="empty">Henüz ödeme listesi oluşturulmadı.</div>'}</div></div><div class="callout">Yıllık fiyat ve kullanım süreleri genelgeye göre değişebilir. Tarifeyi her yıl gözden geçirin; hesaplama öncesi doğru yılın fiyatlarını ve uygulanacak vergi oranlarını girin.</div>`}
-function institutionsPage(){return `<div class="card"><div class="cardhead"><div><h2>Kurum listesi</h2><p>Müdürlük ve bağlı okul/kurum kayıtları</p></div><button class="btn" data-action="add-inst">+ Kurum ekle</button></div>${db.institutions.length?`<div class="tablewrap"><table><thead><tr><th>Kurum adı</th><th>Kurum türü</th><th>Personel</th><th></th></tr></thead><tbody>${db.institutions.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td>${esc(i.type||'—')}</td><td>${db.staff.filter(s=>s.institutionId===i.id&&s.active!==false).length}</td><td><button class="smallbtn" data-action="edit-inst" data-id="${esc(i.id)}">Düzenle</button> <button class="smallbtn" data-action="del-inst" data-id="${esc(i.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Henüz kurum eklenmemiş. İlk kurumunuzu ekleyerek başlayın.</div>'}</div>`}
+const INST_TYPES=['İlkokul','Ortaokul','Ortaöğretim','İlçe Millî Eğitim Müdürlüğü','Diğer kurum'];
+
+function instCategory(i){
+  const t=String(i&&i.type||'');
+  if(INST_TYPES.indexOf(t)>=0)return t;
+  const n=String(i&&i.name||'').toLocaleLowerCase('tr');
+  if(n.indexOf('ilkokul')>=0)return 'İlkokul';
+  if(n.indexOf('ortaokul')>=0)return 'Ortaokul';
+  if(n.indexOf('lise')>=0)return 'Ortaöğretim';
+  if(n.indexOf('halk eğitim')>=0||n.indexOf('mesleki eğitim')>=0)return 'Diğer kurum';
+  if(n.indexOf('ilçe')>=0||n.indexOf('milli eğitim')>=0)return 'İlçe Millî Eğitim Müdürlüğü';
+  return 'Diğer kurum';
+}
+
+function districtUnit(){
+  const i=db.institutions.find(x=>instCategory(x)==='İlçe Millî Eğitim Müdürlüğü');
+  return i?i.name:'Sivaslı İlçe Millî Eğitim Müdürlüğü';
+}
+
+function institutionsPage(){
+  const counts={};INST_TYPES.forEach(t=>counts[t]=0);
+  db.institutions.forEach(i=>{const c=instCategory(i);counts[c]=(counts[c]||0)+1});
+  const active=db.staff.filter(s=>s.active!==false).length;
+  const line=(label,key)=>`<div class="statline"><span>${label}</span><b>${counts[key]||0}</b></div>`;
+  return `<div class="split">
+    <div class="card">
+      <div class="cardhead"><div><h2>Kurum listesi</h2><p>Müdürlük ve bağlı okul/kurum kayıtları</p></div><button class="btn" data-action="add-inst">+ Kurum ekle</button></div>
+      ${db.institutions.length
+        ? `<div class="tablewrap compact"><table class="inst-table"><thead><tr><th>Kurum adı</th><th>Tür</th><th>Personel</th><th></th></tr></thead><tbody>${db.institutions.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td><span class="badge">${esc(instCategory(i))}</span></td><td>${db.staff.filter(s=>s.institutionId===i.id&&s.active!==false).length}</td><td class="nowrap"><button class="smallbtn" data-action="edit-inst" data-id="${esc(i.id)}">Düzenle</button><button class="smallbtn" data-action="del-inst" data-id="${esc(i.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`
+        : '<div class="empty">Henüz kurum eklenmemiş. İlk kurumunuzu ekleyerek başlayın.</div>'}
+    </div>
+    <div class="card stats-card">
+      <div class="cardhead"><div><h2>Kurum dağılımı</h2><p>${db.institutions.length} kurum · ${active} aktif personel</p></div></div>
+      <div class="statlines">
+        ${line('İlkokul','İlkokul')}
+        ${line('Ortaokul','Ortaokul')}
+        ${line('Ortaöğretim','Ortaöğretim')}
+        ${line('Diğer kurum','Diğer kurum')}
+        ${line('İlçe idaresi','İlçe Millî Eğitim Müdürlüğü')}
+      </div>
+      <div class="statlines total"><div class="statline"><span>Toplam kurum</span><b>${db.institutions.length}</b></div></div>
+      <p class="hint">Tür bilgisi kurum adından da çıkarılır: İlkokulu, Ortaokulu, Lisesi, Halk/Mesleki Eğitim Merkezi, İlçe Millî Eğitim Müdürlüğü.</p>
+    </div>
+  </div>`;
+}
 function staffPage(){let list=db.staff.filter(s=>!selectedInstitution||s.institutionId===selectedInstitution);return `<div class="card"><div class="cardhead"><div><h2>Personel kayıtları</h2><p>Personel havuzu, giyim yardımı hesaplamalarında kullanılacak temel bilgileri tutar.</p></div><div class="actions"><button class="btn secondary" data-action="import-staff">CSV içe aktar</button><button class="btn" data-action="add-staff">+ Personel ekle</button><input type="file" id="csvFile" accept=".csv,text/csv" hidden></div></div><div class="toolbar"><select class="fieldinput" id="filterInstitution"><option value="">Tüm kurumlar</option>${db.institutions.map(i=>`<option value="${esc(i.id)}" ${selectedInstitution===i.id?'selected':''}>${esc(i.name)}</option>`).join('')}</select><input class="fieldinput search" id="staffSearch" placeholder="Ad, unvan veya kurum ara..."></div>${list.length?`<div class="tablewrap"><table id="staffTable"><thead><tr><th>Ad soyad</th><th>Kurum</th><th>Unvan</th><th>Hizmet sınıfı</th><th>Durum</th><th></th></tr></thead><tbody>${list.map(s=>`<tr data-search="${esc((s.name+' '+s.title+' '+instName(s.institutionId)).toLocaleLowerCase('tr'))}"><td><b>${esc(s.name)}</b></td><td>${esc(instName(s.institutionId))}</td><td>${esc(s.title)}</td><td>${esc(s.serviceClass)}</td><td>${s.active===false?'<span class="badge red">Pasif</span>':'<span class="badge">Aktif</span>'}</td><td><button class="smallbtn" data-action="edit-staff" data-id="${esc(s.id)}">Düzenle</button> <button class="smallbtn" data-action="del-staff" data-id="${esc(s.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Bu ölçütlerde personel yok. CSV ile içe aktarabilir veya elle ekleyebilirsiniz.</div>'}<div class="callout green">CSV başlıkları: <b>Ad Soyad, Kurum, Unvan, Hizmet Sınıfı</b>. Dosyanız UTF-8 veya Türkçe Windows kodlamasında olabilir. T.C. kimlik numarası uygulama tarafından istenmez.</div></div>`}
 function tariffsPage(){let yearRow=db.years.find(x=>Number(x.year)===Number(activeYear))||{year:activeYear,incomeTax:'',stampTax:''}, rows=db.tariffs.filter(t=>Number(t.year)===Number(activeYear));return `<div class="toolbar"><div class="field" style="margin:0"><label>Tarife yılı</label><select id="yearSelect">${yearOptions()}</select></div><button class="btn" data-action="add-tariff">+ Tarife kalemi ekle</button><button class="btn secondary right" data-action="backup">Yedek al</button><button class="btn secondary" data-action="restore">Yedek yükle</button><button class="btn secondary" data-action="open-backups">Yedek klasörü</button><input type="file" id="backupFile" accept=".json,application/json" hidden></div><div class="card"><div class="cardhead"><div><h2>${activeYear} yılı uygulama ayarları</h2><p>Nakdi ödeme hesaplarında kullanılacak oranlar ve genelge kaydı</p></div><button class="btn light" data-action="save-year">Ayarları kaydet</button></div><div class="formgrid"><div class="field"><label>Gelir vergisi kesinti oranı (%)</label><input type="number" id="incomeTax" min="0" max="100" step="0.01" value="${esc(yearRow.incomeTax)}" placeholder="Uygulanacak oranı girin"></div><div class="field"><label>Damga vergisi kesinti oranı (%)</label><input type="number" id="stampTax" min="0" max="100" step="0.001" value="${esc(yearRow.stampTax)}" placeholder="Uygulanacak oranı girin"></div><div class="field wide"><label>Genelge / kaynak notu</label><input id="yearSource" value="${esc(yearRow.source||'')}" placeholder="Örn. HMB 2026/4 Sıra No’lu Genelge, 08.01.2026"></div></div><p class="hint">Bu oranlar için uygulamanızda esas aldığınız bordro/mevzuat oranlarını girin. Uygulama, girilen oranları brüt nakdi giyecek tutarına uygular; oranı kendiliğinden tahmin etmez.</p></div><div class="card"><div class="cardhead"><div><h2>Yardım tarifesi</h2><p>Unvan ve hizmet sınıfı bazında giyecek kalemleri, brüt tutar ve tekrar süresi</p></div><span class="badge">${rows.length} kalem</span></div>${rows.length?`<div class="tablewrap"><table><thead><tr><th>Unvan</th><th>Hizmet sınıfı</th><th>Giyecek</th><th>Yardım türü</th><th>Birim tutarı</th><th>Kullanım süresi</th><th></th></tr></thead><tbody>${rows.map(t=>`<tr><td>${esc(t.title)}</td><td>${esc(t.serviceClass||'Tüm sınıflar')}</td><td><b>${esc(t.item)}</b></td><td><span class="badge ${t.mode==='Ayni'?'amber':''}">${esc(t.mode)}</span></td><td class="money">${money(t.amount)}</td><td>${t.years} yıl</td><td><button class="smallbtn" data-action="del-tariff" data-id="${esc(t.id)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Bu yıl için tarife yok. Genelgedeki uygun kalemleri ekleyin.</div>'}</div>`}
 function yearOptions(){let ys=[...new Set([...db.years.map(x=>Number(x.year)),...db.tariffs.map(x=>Number(x.year)),YEAR_NOW,activeYear])].sort((a,b)=>b-a);return ys.map(y=>`<option value="${y}" ${Number(activeYear)===y?'selected':''}>${y}</option>`).join('')}
@@ -29,7 +73,33 @@ function modal(title,sub,content,submitLabel='Kaydet'){const d=$('#modal');$('#m
 function field(label,name,placeholder='',type='text',value=''){return `<div class="field"><label>${label}</label><input name="${name}" type="${type}" placeholder="${placeholder}" value="${esc(value)}" required></div>`}
 // [temizlendi] eski bindPage() tanimi
 // [temizlendi] eski action() tanimi
-function addInst(){let d=modal('Kurum ekle','Müdürlük veya bağlı kurum kaydı oluşturun.',`<div class="formgrid">${field('Kurum adı','name','Örn. Atatürk Ortaokulu')}<div class="field"><label>Kurum türü</label><select name="type"><option>İlçe Millî Eğitim Müdürlüğü</option><option>Okul</option><option>Diğer kurum</option></select></div></div>`);$('#modalSave').onclick=async e=>{e.preventDefault();let f=new FormData($('#modalForm'));let name=f.get('name').trim();if(!name)return;db.institutions.push({id:id(),name,type:f.get('type')});await save();d.close();render();toast('Kurum eklendi.')}}
+function addInst(){
+  const opts=INST_TYPES.map(t=>`<option>${esc(t)}</option>`).join('');
+  const d=modal('Kurum ekle','Müdürlük veya bağlı kurum kaydı oluşturun.',`<div class="formgrid">${field('Kurum adı','name','Örn. Atatürk Ortaokulu')}<div class="field"><label>Kurum türü</label><select name="type">${opts}</select></div></div>`);
+  $('#modalSave').onclick=async e=>{
+    e.preventDefault();
+    const f=new FormData($('#modalForm'));
+    const name=String(f.get('name')||'').trim();
+    if(!name)return;
+    db.institutions.push({id:id(),name,type:f.get('type')});
+    await save();d.close();render();toast('Kurum eklendi.');
+  };
+}
+
+function editInst(key){
+  const it=db.institutions.find(x=>x.id===key);if(!it)return;
+  const current=instCategory(it);
+  const opts=INST_TYPES.map(t=>`<option ${t===current?'selected':''}>${esc(t)}</option>`).join('');
+  const d=modal('Kurumu düzenle','Kurum bilgilerini güncelleyin.',`<div class="formgrid">${field('Kurum adı','name','Örn. Atatürk Ortaokulu','text',it.name)}<div class="field"><label>Kurum türü</label><select name="type">${opts}</select></div></div>`);
+  $('#modalSave').onclick=async e=>{
+    e.preventDefault();
+    const f=new FormData($('#modalForm'));
+    const name=String(f.get('name')||'').trim();
+    if(!name){toast('Kurum adı zorunlu.');return}
+    it.name=name;it.type=f.get('type');
+    await save();d.close();render();toast('Kurum güncellendi.');
+  };
+}
 // [temizlendi] eski addStaff() tanimi
 function addTariff(){let d=modal('Tarife kalemi ekle',`${activeYear} yılı için genelgedeki bir giyecek/yardım hakkını tanımlayın.`, `<div class="formgrid">${field('Kadro unvanı','title','Örn. Şoför')}<div class="field"><label>Hizmet sınıfı (boş = tümü)</label><select name="serviceClass"><option value="">Tüm hizmet sınıfları</option>${classes.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>${field('Giyecek kalemi','item','Örn. Ayakkabı')}<div class="field"><label>Yardım türü</label><select name="mode"><option>Nakdi</option><option>Ayni</option></select></div>${field('Birim tutarı (TL)','amount','Örn. 320,98','number')}<div class="field"><label>Kullanım süresi (yıl)</label><input name="years" type="number" min="1" step="1" value="1" required></div></div><p class="hint">Nakdi yardım için genelgedeki azami birim fiyatı, ayni yardım için kurumunuzun uygulayacağı fiyatı girin.</p>`);$('#modalSave').onclick=async e=>{e.preventDefault();let f=new FormData($('#modalForm')), amount=Number(f.get('amount')), years=Number(f.get('years'));if(!f.get('title').trim()||!f.get('item').trim()||amount<0||years<1)return;db.tariffs.push({id:id(),year:activeYear,title:f.get('title').trim(),serviceClass:f.get('serviceClass'),item:f.get('item').trim(),mode:f.get('mode'),amount,years});await save();d.close();render();toast('Tarife kalemi eklendi.')}}
 function deleteRow(collection,key,msg){if(!confirm(msg))return;db[collection]=db[collection].filter(x=>x.id!==key);save().then(()=>{render();toast('Kayıt silindi.')})}
@@ -85,21 +155,83 @@ function yearCatalogPage(){
     <div class="field" style="margin:0"><label>Kalem ara</label><input id="catalogSearch" placeholder="Giyecek adı…"></div>
     <button class="btn secondary" data-action="import-tariff-pdf">PDF sayfalarını içe aktar</button>
     <input type="file" id="tariffPdfFiles" accept="application/pdf,.pdf" multiple hidden>
-    <button class="btn secondary" data-action="add-tariff">+ Giyecek kalemi ekle</button>
-    <button class="btn secondary" data-action="new-year">Yeni yıl oluştur</button>
-    <button class="btn secondary right" data-action="backup">Yedek al</button>
-    <button class="btn secondary" data-action="restore">Yedek yükle</button>
-    <button class="btn secondary" data-action="open-backups">Yedek klasörü</button>
-    <input type="file" id="backupFile" accept=".json,application/json" hidden>
+    <button class="btn secondary right" data-action="new-year">Yeni yıl oluştur</button>
   </div>
   <div class="card">
-    <div class="cardhead"><div><h2>${activeYear} yılı azami birim fiyatları</h2><p>Her giyecek için nakdi ve ayni fiyatı ayrı ayrı güncelleyebilirsiniz.</p></div><span class="badge" id="catalogCount">${items.length} kalem</span></div>
-    ${items.length?`<div class="tablewrap catalog-wrap"><table class="catalog-table" id="catalogTable"><thead><tr><th>Giyecek kalemi</th><th>Nakdi birim fiyatı</th><th>Ayni azami fiyatı</th><th>Kullanım süresi</th><th></th></tr></thead><tbody>${data.map(x=>`<tr data-search="${esc(norm(x.item))}"><td><b>${esc(x.item)}</b></td><td class="money">${x.nakdi?money(x.nakdi.amount):'—'}</td><td class="money">${x.ayni?money(x.ayni.amount):'—'}</td><td>${(x.nakdi?.years||x.ayni?.years)?`${x.nakdi?.years||x.ayni?.years} yıl`:'—'}</td><td class="nowrap"><button class="smallbtn" data-action="edit-price" data-item="${esc(x.item)}">Düzenle</button><button class="smallbtn" data-action="del-price" data-item="${esc(x.item)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Bu yıl için fiyat listesi yok. Yeni yıl oluşturup önceki yıl listesini kopyalayabilir veya kalem ekleyebilirsiniz.</div>'}
-    <div class="callout green">2026 Ek-1 (ayni) ve Ek-2 (nakdi) fiyatları ekli PDF’den yüklendi. Yeni yıl oluşturduğunuzda önceki yılın kalemleri kopyalanır; yeni genelge tutarlarını güncelleyin.</div>
+    <div class="cardhead"><div><h2>${activeYear} yılı azami birim fiyatları</h2><p>Giyecek kalemleri Bakanlık PDF’lerinden içe aktarılır; tutarları buradan güncelleyebilirsiniz.</p></div><span class="badge" id="catalogCount">${items.length} kalem</span></div>
+    ${items.length?`<div class="tablewrap catalog-wrap"><table class="catalog-table" id="catalogTable"><thead><tr><th>Giyecek kalemi</th><th>Nakdi birim fiyatı</th><th>Ayni azami fiyatı</th><th></th></tr></thead><tbody>${data.map(x=>`<tr data-search="${esc(norm(x.item))}"><td><b>${esc(x.item)}</b></td><td class="money">${x.nakdi?money(x.nakdi.amount):'—'}</td><td class="money">${x.ayni?money(x.ayni.amount):'—'}</td><td class="nowrap"><button class="smallbtn" data-action="edit-price" data-item="${esc(x.item)}">Düzenle</button><button class="smallbtn" data-action="del-price" data-item="${esc(x.item)}">Sil</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Bu yıl için fiyat listesi yok. “PDF sayfalarını içe aktar” ile Bakanlık listesini yükleyin veya yeni yıl oluşturun.</div>'}
+    <div class="callout green">Fiyatlar yıllık genelgedeki azami birim tutarlardır. Yeni yıl oluşturduğunuzda önceki yılın kalemleri kopyalanır; yeni genelge tutarlarını güncelleyin.</div>
   </div>`;
 }
 function manualPaymentsPage(){const institutions=db.institutions;const batches=db.batches.filter(b=>Number(b.year)===Number(activeYear));return `<div class="card"><div class="cardhead"><div><h2>Ödeme dönemi ve kurum</h2><p>Ödeme yılını seçin, ardından kurumu seçerek personel listesine geçin.</p></div></div><div class="toolbar"><div class="field" style="margin:0"><label>Ödeme yılı</label><select id="paymentYear">${yearOptions()}</select></div><div class="field" style="margin:0;min-width:280px"><label>Kurum seçin</label><select id="paymentInstitution"><option value="">Kurum seçin</option>${institutions.map(x=>`<option value="${esc(x.id)}" ${x.id===selectedInstitution?'selected':''}>${esc(x.name)}</option>`).join('')}</select></div><span class="badge">${priceRows().length?`${uniqueItems().length} giyecek kalemi hazır`:'Fiyat listesi yok'}</span></div><div class="hint">Kurum seçince bağlı personeller görünür. Personeli işaretleyip verilecek ayni/nakdi giyecek kalemlerini seçin.</div></div><div id="peopleList"></div><div id="calcResult"></div><div class="card"><div class="cardhead"><div><h2>${activeYear} kayıtlı ödeme listeleri</h2><p>Önceden hazırlanmış kurum listeleri</p></div></div>${batches.length?tableBatches(batches.slice().reverse()):'<div class="empty">Bu yıl için ödeme listesi kaydedilmedi.</div>'}</div>`}
-function drawRoster(){const root=$('#peopleList');if(!root)return;if(!selectedInstitution){root.innerHTML='<div class="card empty">Önce kurum seçin. Kuruma kayıtlı tüm aktif personeller burada listelenecek.</div>';return}const staff=db.staff.filter(s=>s.institutionId===selectedInstitution&&s.active!==false);if(!staff.length){root.innerHTML='<div class="card empty">Bu kuruma henüz aktif personel kaydedilmemiş.</div>';return}root.innerHTML=`<div class="card"><div class="cardhead"><div><h2>${esc(instName(selectedInstitution))} · Personel seçimi</h2><p>${staff.length} aktif personel kayıtlı. Yardım verilecek personelleri işaretleyin.</p></div><button class="btn" data-action="calculate">Seçimleri hesapla</button></div><div class="person-list">${staff.map(s=>{const st=window.paymentSelection?.[s.id]||{selected:false,items:{}};return `<section class="person-card"><label class="person-top"><input type="checkbox" data-person-check="${esc(s.id)}" ${st.selected?'checked':''}><span class="person-name">${esc(s.name)}</span><span class="badge">${esc(s.title)}</span><span class="person-class">${esc(s.serviceClass||'')}</span></label><div class="person-panel" ${st.selected?'':'hidden'}>${st.selected?personItemTable(s.id):''}</div></section>`}).join('')}</div><div class="callout">T.C. kimlik numarası yalnızca dağıtım listesi çıktısı için gerektiğinde personel kaydına eklenebilir. Daha önce kayıtlı kişi bilgileri otomatik olarak değiştirilmez.</div></div>`;bindRoster()}
+function drawRoster(){
+  const root=$('#peopleList');if(!root)return;
+  if(!selectedInstitution){root.innerHTML='<div class="card empty">Önce kurum seçin. Kuruma kayıtlı tüm aktif personeller burada listelenecek.</div>';return}
+  const staff=db.staff.filter(s=>s.institutionId===selectedInstitution&&s.active!==false);
+  if(!staff.length){root.innerHTML='<div class="card empty">Bu kuruma henüz aktif personel kaydedilmemiş.</div>';return}
+  root.innerHTML=`<div class="card"><div class="cardhead"><div><h2>${esc(instName(selectedInstitution))} · Personel seçimi</h2><p>${staff.length} aktif personel. Kutucuk yalnızca seçim yapar; yardım kalemleri için kişi adına tıklayın.</p></div><button class="btn" data-action="calculate">Seçimleri hesapla</button></div>
+  <div class="person-list">${staff.map(s=>{
+    const st=window.paymentSelection?.[s.id]||{selected:false,items:{}};
+    const picked=Object.entries(st.items||{}).filter(([,q])=>q&&q.checked);
+    const total=picked.reduce((a,[item,q])=>{const p=priceFor(item,q.mode);return a+(p?p.amount*(Number(q.quantity)||1):0)},0);
+    return `<div class="person-row${st.selected?' on':''}">
+      <label class="person-pick"><input type="checkbox" data-person-check="${esc(s.id)}" ${st.selected?'checked':''}></label>
+      <button class="person-name-btn" type="button" data-person-open="${esc(s.id)}">${esc(s.name)}</button>
+      <span class="badge">${esc(s.title)}</span>
+      <span class="person-class">${esc(s.serviceClass||'')}</span>
+      <span class="person-sum">${picked.length?`${picked.length} kalem · ${money(total)}`:'yardım girilmedi'}</span>
+    </div>`}).join('')}</div>
+  <div class="callout">Kişi adına tıklayarak giyecek kalemlerini ekleyip çıkarabilirsiniz. Kutucuk yalnızca kişiyi ödeme listesine dahil eder. T.C. kimlik numarası dağıtım listesi çıktısı için personel kaydından gelir.</div></div>`;
+  bindRoster();
+}
+
+function bindRoster(){
+  const root=$('#peopleList');if(!root)return;
+  root.onchange=e=>{
+    const t=e.target;
+    if(!t.matches('[data-person-check]'))return;
+    const sid=t.dataset.personCheck;
+    const rec=window.paymentSelection[sid]||(window.paymentSelection[sid]={selected:false,items:{}});
+    rec.selected=t.checked;
+    const row=t.closest('.person-row');
+    if(row)row.classList.toggle('on',t.checked);
+  };
+  root.onclick=e=>{
+    const open=e.target.closest('[data-person-open]');
+    if(open)openPerson(open.dataset.personOpen);
+  };
+}
+
+function openPerson(sid){
+  const s=db.staff.find(x=>x.id===sid);if(!s)return;
+  const d=modal('Yardım bilgileri',`${esc(s.name)} · ${esc(s.title||'')} · ${esc(instName(s.institutionId))}`,`<div id="personPanel">${personItemTable(sid)}</div>`,'Kapat');
+  bindPersonPanel($('#personPanel'),sid);
+  d.addEventListener('close',()=>drawRoster(),{once:true});
+}
+
+function bindPersonPanel(root,sid){
+  if(!root)return;
+  const refresh=()=>{root.innerHTML=personItemTable(sid);bindPersonPanel(root,sid);drawRoster()};
+  root.onclick=e=>{
+    const add=e.target.closest('[data-pick-add]');
+    if(add){
+      const item=root.querySelector('[data-pick-item]').value;
+      const mode=root.querySelector('[data-pick-mode]').value;
+      const qty=Math.max(1,Number(root.querySelector('[data-pick-qty]').value)||1);
+      if(!item){toast('Önce giyecek kalemi seçin.');return}
+      const rec=window.paymentSelection[sid]||(window.paymentSelection[sid]={selected:true,items:{}});
+      rec.items[item]={checked:true,mode,quantity:qty};
+      refresh();
+      return;
+    }
+    const del=e.target.closest('[data-pick-remove]');
+    if(del){
+      const rec=window.paymentSelection[sid];
+      if(rec&&rec.items)delete rec.items[del.dataset.pickRemove];
+      refresh();
+    }
+  };
+}
 function personItemTable(staffId){
   const items=uniqueItems();
   if(!items.length)return '<div class="empty">Bu yılın giyecek fiyat listesi boş. Önce Yıllık Fiyat Listesi sayfasını tamamlayın.</div>';
@@ -119,45 +251,31 @@ function personItemTable(staffId){
     <div class="person-total">Bu kişiye yapılacak ödeme: <b>${money(total)}</b></div>
   </div>`;
 }
-function bindRoster(){
-  const root=$('#peopleList');if(!root)return;
-  root.onchange=e=>{
-    const t=e.target;
-    if(t.matches('[data-person-check]')){
-      const sid=t.dataset.personCheck;
-      window.paymentSelection[sid]=window.paymentSelection[sid]||{selected:false,items:{}};
-      window.paymentSelection[sid].selected=t.checked;
-      const panel=t.closest('.person-card').querySelector('.person-panel');
-      panel.hidden=!t.checked;
-      panel.innerHTML=t.checked?personItemTable(sid):'';
-    }
-  };
-  root.onclick=e=>{
-    const add=e.target.closest('[data-pick-add]');
-    if(add){
-      const sid=add.dataset.staff,card=add.closest('.person-card');
-      const item=card.querySelector('[data-pick-item]').value;
-      const mode=card.querySelector('[data-pick-mode]').value;
-      const qty=Math.max(1,Number(card.querySelector('[data-pick-qty]').value)||1);
-      if(!item){toast('Önce giyecek kalemi seçin.');return}
-      const rec=window.paymentSelection[sid]||(window.paymentSelection[sid]={selected:true,items:{}});
-      rec.items[item]={checked:true,mode,quantity:qty};
-      card.querySelector('.person-panel').innerHTML=personItemTable(sid);
-      return;
-    }
-    const del=e.target.closest('[data-pick-remove]');
-    if(del){
-      const sid=del.dataset.staff,item=del.dataset.pickRemove;
-      const rec=window.paymentSelection[sid];
-      if(rec&&rec.items)delete rec.items[item];
-      del.closest('.person-panel').innerHTML=personItemTable(sid);
-    }
-  };
-}
+// [tasindi] bu fonksiyon ilgili sayfa blogunda yeniden tanimlandi
 function bindPage(){const y=$('#yearSelect');if(y)y.onchange=()=>{activeYear=Number(y.value);render()};const py=$('#paymentYear');if(py)py.onchange=()=>{const n=Number(py.value);if(n!==activeYear){activeYear=n;window.paymentSelection={}}render()};const pi=$('#paymentInstitution');if(pi)pi.onchange=()=>{selectedInstitution=pi.value;window.paymentSelection={};render()};const fi=$('#filterInstitution');if(fi)fi.onchange=()=>{selectedInstitution=fi.value;render()};const search=$('#staffSearch');if(search)search.oninput=()=>$$('#staffTable tbody tr').forEach(r=>r.hidden=!r.dataset.search.includes(search.value.toLocaleLowerCase('tr')));$$('[data-goto]').forEach(b=>b.onclick=()=>setPage(b.dataset.goto));$$('[data-action]').forEach(b=>b.onclick=()=>action(b.dataset.action,b.dataset.id,b.dataset.item));const cs=$('#catalogSearch');if(cs)cs.oninput=()=>{const q=norm(cs.value);$$('#catalogTable tbody tr').forEach(r=>r.hidden=!!q&&!r.dataset.search.includes(q))};const backup=$('#backupFile');if(backup)backup.onchange=async e=>{if(e.target.files[0])await restoreBackup(e.target.files[0]);e.target.value=''};const csv=$('#csvFile');if(csv)csv.onchange=async e=>{if(e.target.files[0])await importCsv(e.target.files[0]);e.target.value=''}}
 async function createYear(){const last=Math.max(YEAR_NOW,...db.tariffs.map(t=>Number(t.year)||0));const value=prompt('Yeni fiyat yılı',String(last+1));if(!value)return;const yr=Number(value);if(!Number.isInteger(yr)||yr<2000||yr>2200){toast('Geçerli bir yıl girin.');return}if(db.tariffs.some(t=>Number(t.year)===yr)){toast('Bu yılın fiyat listesi zaten var.');activeYear=yr;return render()}const prior=[...new Set(db.tariffs.map(t=>Number(t.year)).filter(x=>x<yr))].sort((a,b)=>b-a)[0];if(prior)for(const t of priceRows(prior))db.tariffs.push({...t,id:id(),year:yr,source:`${prior} yılından kopyalandı · güncelleyin`});db.years=db.years.filter(x=>Number(x.year)!==yr);db.years.push({year:yr,incomeTax:'',stampTax:'',source:prior?`${prior} yılından kopyalandı · güncelleyin`:'Yeni yıl fiyat listesi'});activeYear=yr;await save();render();toast(prior?`${prior} yılının fiyatları kopyalandı. Yeni tutarları güncelleyin.`:`${yr} yılı oluşturuldu.`)}
 async function action(a,key,item){if(a==='open-backups')return openBackups();if(a==='import-tariff-pdf')return importOfficialTariffs();if(a==='new-year')return createYear();if(a==='add-inst')return addInst();if(a==='edit-inst')return editInst(key);if(a==='add-staff')return addStaff();if(a==='edit-staff')return editStaff(key);if(a==='add-tariff')return addPrice();if(a==='edit-price')return editPrice(item);if(a==='del-price')return deletePrice(item);if(a==='copy-prices')return copyPrices();if(a==='del-inst')return deleteRow('institutions',key,'Kurumu silmek istediğinize emin misiniz?');if(a==='del-staff')return deleteRow('staff',key,'Personel kaydını silmek istediğinize emin misiniz?');if(a==='save-year')return saveYear();if(a==='calculate')return calculate();if(a==='view-batch')return viewBatch(key);if(a==='edit-batch')return editBatch(key);if(a==='del-batch')return deleteBatch(key);if(a==='backup')return backup();if(a==='restore')return $('#backupFile')?.click();if(a==='import-staff')return $('#csvFile')?.click()}
-function priceEditor(item=''){const n=priceFor(item,'Nakdi'),a=priceFor(item,'Ayni'),d=modal(item?'Giyecek fiyatını düzenle':'Giyecek kalemi ekle',`${activeYear} fiyat kataloğu · Ek-1 ayni ve Ek-2 nakdi fiyatları ayrı tutulur.`, `<div class="formgrid"><div class="field wide"><label>Giyecek kalemi</label><input name="item" value="${esc(item)}" ${item?'readonly':''} required></div><div class="field"><label>Nakdi birim fiyatı (TL)</label><input name="nakdi" type="number" min="0" step="0.01" value="${n?esc(n.amount):''}" placeholder="Nakdi fiyat"></div><div class="field"><label>Ayni azami fiyatı (TL)</label><input name="ayni" type="number" min="0" step="0.01" value="${a?esc(a.amount):''}" placeholder="Ayni fiyat"></div><div class="field"><label>Kullanım süresi (yıl, isteğe bağlı)</label><input name="years" type="number" min="0" step="1" value="${n?.years||a?.years||''}" placeholder="Eklerde belirtilmemiş"></div></div><p class="hint">Fiyatlar yıllık genelgedeki azami birim tutarlardır. Kullanım süresi fiyat ekinde yoksa boş bırakın; uygulama süre varsaymaz.</p>`);$('#modalSave').onclick=async e=>{e.preventDefault();const f=new FormData($('#modalForm')),name=String(f.get('item')||'').trim(),nakdi=String(f.get('nakdi')||'').trim(),ayni=String(f.get('ayni')||'').trim(),years=Number(f.get('years'))||0;if(!name||(!nakdi&&!ayni)){toast('Giyecek adı ve en az bir fiyat girin.');return}db.tariffs=db.tariffs.filter(t=>!(Number(t.year)===Number(activeYear)&&t.item===name));if(nakdi)db.tariffs.push({id:id(),year:activeYear,item:name,mode:'Nakdi',amount:Number(nakdi),years,source:'Kullanıcı girişi'});if(ayni)db.tariffs.push({id:id(),year:activeYear,item:name,mode:'Ayni',amount:Number(ayni),years,source:'Kullanıcı girişi'});await save();d.close();render();toast('Yıllık fiyat listesi güncellendi.')}}
+function priceEditor(item=''){
+  const n=priceFor(item,'Nakdi'),a=priceFor(item,'Ayni');
+  const d=modal(item?'Giyecek fiyatını düzenle':'Giyecek kalemi ekle',`${activeYear} fiyat kataloğu · Ek-1 ayni ve Ek-2 nakdi fiyatları ayrı tutulur.`,
+    `<div class="formgrid">
+      <div class="field wide"><label>Giyecek kalemi</label><input name="item" value="${esc(item)}" ${item?'readonly':''} required></div>
+      <div class="field"><label>Nakdi birim fiyatı (TL)</label><input name="nakdi" type="number" min="0" step="0.01" value="${n?esc(n.amount):''}" placeholder="Nakdi fiyat"></div>
+      <div class="field"><label>Ayni azami fiyatı (TL)</label><input name="ayni" type="number" min="0" step="0.01" value="${a?esc(a.amount):''}" placeholder="Ayni fiyat"></div>
+    </div><p class="hint">Fiyatlar yıllık genelgedeki azami birim tutarlardır. Boş bırakılan tür katalogda görünmez.</p>`);
+  $('#modalSave').onclick=async e=>{
+    e.preventDefault();
+    const f=new FormData($('#modalForm'));
+    const name=String(f.get('item')||'').trim();
+    const nakdi=String(f.get('nakdi')||'').trim();
+    const ayni=String(f.get('ayni')||'').trim();
+    if(!name||(!nakdi&&!ayni)){toast('Giyecek adı ve en az bir fiyat girin.');return}
+    db.tariffs=db.tariffs.filter(t=>!(Number(t.year)===Number(activeYear)&&t.item===name));
+    if(nakdi)db.tariffs.push({id:id(),year:activeYear,item:name,mode:'Nakdi',amount:Number(nakdi),years:0,source:'Kullanıcı girişi'});
+    if(ayni)db.tariffs.push({id:id(),year:activeYear,item:name,mode:'Ayni',amount:Number(ayni),years:0,source:'Kullanıcı girişi'});
+    await save();d.close();render();toast('Yıllık fiyat listesi güncellendi.');
+  };
+}
 function addPrice(){return priceEditor()}
 function editPrice(item){return priceEditor(item)}
 function deletePrice(item){if(!confirm(`“${item}” kaleminin bu yıldaki nakdi ve ayni fiyatlarını silmek istiyor musunuz?`))return;db.tariffs=db.tariffs.filter(t=>!(Number(t.year)===Number(activeYear)&&t.item===item));save().then(()=>{render();toast('Giyecek kalemi silindi.')})}
@@ -175,9 +293,9 @@ function viewBatch(key){
   const cfg=db.documentSettings||{};
   const h=b.harcama||{};
   const inst=instName(b.institutionId);
+  const unit=districtUnit();
   const autoExplanation=`${inst} bünyesinde görev yapan ve giyim yardımından faydalanacak personele ait harcama talimatıdır.`;
   const explanation=(h.explanation&&String(h.explanation).trim())||autoExplanation;
-  const explanationTitle=(h.explanationTitle&&String(h.explanationTitle).trim())||'Aşağıda belirtilen personele ödenecek giyim yardımı ödemesi';
   const proposedName=h.proposedName||cfg.proposedName||'';
   const proposedTitle=h.proposedTitle||cfg.proposedTitle||'';
   const authorityName=h.authorityName||cfg.authorityName||'';
@@ -185,19 +303,14 @@ function viewBatch(key){
   const editorName=h.editorName||cfg.editorName||'';
   const editorTitle=h.editorTitle||cfg.editorTitle||'';
 
-  const items=new Map();
-  for(const x of b.details){
-    const qty=Number(x.quantity)||1;
-    const k=`${x.item}¦${x.mode}¦${Number(x.amount)/qty}`;
-    const r=items.get(k)||{item:x.item,mode:x.mode,unit:Number(x.amount)/qty,quantity:0,total:0};
-    r.quantity+=qty;r.total+=Number(x.amount)||0;items.set(k,r);
-  }
   const people=new Map();
   for(const x of b.details){
     const r=people.get(x.staffId)||{name:x.staffName,title:x.title,nationalId:db.staff.find(s=>s.id===x.staffId)?.nationalId||'',details:[],total:0};
     r.details.push(x);r.total+=Number(x.amount)||0;people.set(x.staffId,r);
   }
   const moneyTotal=b.details.reduce((a,x)=>a+Number(x.amount||0),0);
+  const cashTotal=b.details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+Number(x.amount||0),0);
+  const ayniTotal=b.details.filter(x=>x.mode==='Ayni').reduce((a,x)=>a+Number(x.amount||0),0);
 
   const talimatRows=[
     ['Gerekçesi ve hukuki dayanağı',h.basis],
@@ -218,22 +331,24 @@ function viewBatch(key){
     return p.details.map((z,j)=>`<tr>${j===0?head:''}<td>${esc(z.item)}${z.mode==='Ayni'?' (AYNİ)':''}</td><td class="money">${money(z.amount)}</td><td>${Number(z.quantity)||1}</td></tr>`).join('');
   }).join('');
 
-  const body=`<div class="actions no-print"><button class="btn secondary" id="exportCash" type="button">Nakdi CSV indir</button><button class="btn secondary" id="exportAyni" type="button">Ayni CSV indir</button><button class="btn light" id="printReport" type="button">Excel şablonuna uygun PDF’yi yeniden kaydet</button></div><div id="printArea">
+  const sign=name=>`<p><span class="lbl">İmzası :</span><span class="val"></span></p><p><span class="lbl">Adı Soyadı :</span><span class="val">${esc(name.n||'')}</span></p><p><span class="lbl">Unvanı :</span><span class="val">${esc(name.t||'')}</span></p>`;
+
+  const body=`<div class="actions no-print"><button class="btn secondary" id="exportCash" type="button">Nakdi CSV indir</button><button class="btn secondary" id="exportAyni" type="button">Ayni CSV indir</button><button class="btn light" id="printReport" type="button">Harcama talimatı + listeyi PDF olarak kaydet</button></div><div id="printArea">
 
 <section class="printPage instructionPage">
   <h2>HARCAMA TALİMATI</h2>
   <div class="instructionFrame">
-    <div class="instructionTop"><b>Sayı: ${esc(b.number||'')}</b><span><b>Tarih:</b> ${dateText(b.date)}</span></div>
-    <div class="requestUnit"><b>Harcama Talebinde Bulunan Birim:</b><span>${esc(h.unit||inst)}</span></div>
+    <div class="instructionTop"><b>Sayı: 1</b><span><b>Tarih:</b> ${dateText(b.date)}</span></div>
+    <div class="requestUnit"><b>Harcama Talebinde Bulunan Birim:</b><span>${esc(unit)}</span></div>
     <div class="reasonTable">
       <div class="verticalLabel">Y A P I L A C A K&nbsp;&nbsp; H A R C A M A N I N</div>
       <table class="reporttable"><tbody>${talimatRows.map(x=>`<tr><th>${esc(x[0])}</th><td>${esc(x[1]||'')}</td></tr>`).join('')}</tbody></table>
     </div>
-    <div class="explanation"><b>AÇIKLAMALAR:</b><div class="explanationTitle">${esc(explanationTitle)}</div><div class="explanationBox">${esc(explanation)}</div></div>
+    <div class="explanation"><b>AÇIKLAMALAR:</b><div class="explanationBox">${esc(explanation)}</div></div>
     <div class="approval">Yukarıda belirtilen harcamanın yaptırılması hususunu olurlarınıza arz ederim.
       <div class="approvalGrid">
-        <div><div class="signHead">Teklif Eden Yetkilinin</div><p>İmzası :</p><p>Adı Soyadı : ${esc(proposedName)}</p><p>Unvanı : ${esc(proposedTitle)}</p></div>
-        <div><div class="signHead">O L U R</div><p>İmzası :</p><p>Adı Soyadı : ${esc(authorityName)}</p><p>Unvanı : ${esc(authorityTitle)}</p></div>
+        <div><div class="signHead">Teklif Eden Yetkilinin</div>${sign({n:proposedName,t:proposedTitle})}</div>
+        <div><div class="signHead">O L U R</div>${sign({n:authorityName,t:authorityTitle})}</div>
       </div>
     </div>
   </div>
@@ -246,10 +361,13 @@ function viewBatch(key){
     <thead><tr><th>Sıra No</th><th>Adı Soyadı</th><th>Unvanı</th><th>T.C.</th><th>Yardım Adı</th><th>Tutarı</th><th>Adedi</th></tr></thead>
     <tbody>${peopleRows}</tbody>
   </table>
-  <table class="reporttable summaryTable">
-    <thead><tr><th>GİYİM ADI</th><th>BİRİM FİYATI</th><th>ADET</th><th>TOPLAMI</th></tr></thead>
-    <tbody>${[...items.values()].map(x=>`<tr><td>${esc(x.item)}${x.mode==='Ayni'?' (Ayni)':''}</td><td>${money(x.unit)}</td><td>${x.quantity}</td><td>${money(x.total)}</td></tr>`).join('')}<tr class="grandTotal"><th colspan="3">TOPLAM</th><th>${money(moneyTotal)}</th></tr></tbody>
-  </table>
+  <div class="distributionTotal">
+    <span>Kişi sayısı: <b>${people.size}</b></span>
+    <span>Kalem sayısı: <b>${b.details.length}</b></span>
+    <span>Nakdi: <b>${money(cashTotal)}</b></span>
+    <span>Ayni: <b>${money(ayniTotal)}</b></span>
+    <span class="grand">GENEL TOPLAM: <b>${money(moneyTotal)}</b></span>
+  </div>
   <div class="distributionSignatures">
     <div><b>Düzenleyen</b><span>${esc(editorName)}</span><span>${esc(editorTitle)}</span></div>
     <div><b>Kontrol Eden</b><span>${esc(proposedName)}</span><span>${esc(proposedTitle)}</span></div>
@@ -257,7 +375,7 @@ function viewBatch(key){
   </div>
 </section>
 
-</div><div class="callout no-print">PDF’de Excel şablonundaki tam harcama talimatı, kişi bazlı dağıtım, giyecek bazında adet/birim fiyat/toplam ve Düzenleyen · Kontrol Eden · Onaylayan imza alanları bulunur.</div>`;
+</div><div class="callout no-print">İki sayfa tek PDF olarak Masaüstü \\ Giyim Yardımı Çıktıları klasörüne kaydedilir.</div>`;
 
   modal(`Ödeme listesi · ${b.year}`,`${inst} · ${dateText(b.date)}`,body,'Kapat');
   $('#exportCash').onclick=()=>downloadCsv(b,'Nakdi');
@@ -303,12 +421,7 @@ function showPdfPricePreview(result){const sheets=result?.sheets||[],errors=[...
 
 function openBackups(){window.chrome?.webview?.postMessage({type:'openBackupFolder'})}
 // ---- Kurum / personel düzenleme (v1.3.0) ----
-function editInst(key){
-  const it=db.institutions.find(x=>x.id===key);if(!it)return;
-  const types=['İlçe Millî Eğitim Müdürlüğü','Okul','Diğer kurum'];
-  const d=modal('Kurumu düzenle','Kurum bilgilerini güncelleyin.',`<div class="formgrid">${field('Kurum adı','name','Örn. Atatürk Ortaokulu','text',it.name)}<div class="field"><label>Kurum türü</label><select name="type">${types.map(t=>`<option ${it.type===t?'selected':''}>${esc(t)}</option>`).join('')}</select></div></div>`);
-  $('#modalSave').onclick=async e=>{e.preventDefault();const f=new FormData($('#modalForm')),name=String(f.get('name')||'').trim();if(!name){toast('Kurum adı zorunlu.');return}it.name=name;it.type=f.get('type');await save();d.close();render();toast('Kurum güncellendi.')};
-}
+// [tasindi] bu fonksiyon ilgili sayfa blogunda yeniden tanimlandi
 
 function editStaff(key){
   const s=db.staff.find(x=>x.id===key);if(!s)return;

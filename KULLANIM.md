@@ -52,3 +52,11 @@ Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip
 - İmza ve Talimat Ayarları'na **Düzenleyen** bilgisi eklendi.
 - Harcama Talimatı'nda açıklama metni kuruma göre otomatik yazılır; imza alanları ayarlardan doldurulur.
 - Dağıtım Listesi yatay A4 olarak, kişi adı tek satırda gruplanmış ve Düzenleyen · Kontrol Eden · Onaylayan imzalarıyla üretilir.
+### 1.4.0
+
+- Kurumlar sayfası sıkıştırıldı; sağ tarafa **kurum dağılımı** eklendi (İlkokul, Ortaokul, Ortaöğretim, Diğer kurum, İlçe idaresi). Kurum türü adından da otomatik çıkarılır.
+- Ödeme Dönemi'nde onay kutusu yalnızca seçim yapar; **kişi adına tıklayınca** yardım bilgileri açılır pencerede açılır.
+- Yıllık Fiyat Listesi'nden "Kullanım süresi" sütunu ve elle ekleme/yedek düğmeleri kaldırıldı; kalemler PDF içe aktarmayla gelir.
+- Dağıtım listesindeki ikinci tablo kaldırıldı, yerine **genel toplam** satırı geldi; sayfa yatay üretilir.
+- Harcama talimatında sayı **1** olarak sabitlendi, birim **Sivaslı İlçe Millî Eğitim Müdürlüğü** olarak yazılır, açıklama başlığı kaldırıldı, imzacı bilgileri ortalandı.
+- Harcama talimatı ve dağıtım listesi artık **tek PDF** olarak kaydedilir.

@@ -118,3 +118,12 @@ h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
   #printArea .distributionSignatures b{display:block;font:bold 8pt Arial,sans-serif;margin-bottom:14mm;letter-spacing:.3px}
   #printArea .distributionSignatures span{display:block;font:8pt Arial,sans-serif;min-height:4.5mm}
 }
+/* v1.4.0: imzacı değerlerinin ortalanması ve dağıtım toplam satırı */
+@media print{
+  #printArea .approvalGrid p{display:flex;gap:2mm;margin:.5mm 0;font:6.5pt Arial,sans-serif;text-align:left}
+  #printArea .approvalGrid p .lbl{flex:0 0 auto;text-align:left;white-space:nowrap}
+  #printArea .approvalGrid p .val{flex:1 1 auto;text-align:center}
+  #printArea .distributionTotal{display:flex;justify-content:flex-end;align-items:baseline;gap:6mm;margin-top:5mm;font:8pt Arial,sans-serif}
+  #printArea .distributionTotal span{white-space:nowrap}
+  #printArea .distributionTotal .grand{font:bold 9pt Arial,sans-serif;border-top:1px solid #222;padding-top:1mm}
+}

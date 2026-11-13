@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using PdfSharpCore.Pdf.IO;
+using PdfSharpDoc = PdfSharpCore.Pdf.PdfDocument;
 using UglyToad.PdfPig;
 
 namespace GiyimYardimi;
@@ -120,8 +122,11 @@ internal sealed class MainForm : Form
             var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Giyim Yardımı Çıktıları");
             Directory.CreateDirectory(folder);
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var talimatPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_HarcamaTalimatı.pdf");
-            var dagitimPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_DağıtımListesi.pdf");
+            var finalPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}.pdf");
+            var workFolder = Path.Combine(Path.GetTempPath(), "GiyimYardimi");
+            Directory.CreateDirectory(workFolder);
+            var talimatPath = Path.Combine(workFolder, $"talimat_{stamp}.pdf");
+            var dagitimPath = Path.Combine(workFolder, $"dagitim_{stamp}.pdf");
             try
             {
                 await _web.CoreWebView2.ExecuteScriptAsync("document.body.dataset.exportPage='talimat'");
@@ -148,7 +153,11 @@ internal sealed class MainForm : Form
                 if (!await _web.CoreWebView2.PrintToPdfAsync(dagitimPath, landscape))
                     throw new InvalidOperationException("Dağıtım listesi PDF'si oluşturulamadı.");
 
-                var callback = "window.pdfSaved&&window.pdfSaved(" + JsonSerializer.Serialize(new[] { talimatPath, dagitimPath }) + ")";
+                PdfMerger.Merge(finalPath, talimatPath, dagitimPath);
+                try { File.Delete(talimatPath); } catch { }
+                try { File.Delete(dagitimPath); } catch { }
+
+                var callback = "window.pdfSaved&&window.pdfSaved(" + JsonSerializer.Serialize(new[] { finalPath }) + ")";
                 await _web.CoreWebView2.ExecuteScriptAsync(callback);
             }
             finally
@@ -185,6 +194,22 @@ internal sealed class MainForm : Form
             var script = "window.pdfImportFailed&&window.pdfImportFailed(" + JsonSerializer.Serialize(ex.Message) + ")";
             await _web.CoreWebView2.ExecuteScriptAsync(script);
         }
+    }
+}
+
+/// <summary>Ayrı üretilen harcama talimatı ve dağıtım listesi sayfalarını tek PDF dosyasında birleştirir.</summary>
+internal static class PdfMerger
+{
+    public static void Merge(string outputPath, params string[] sources)
+    {
+        using var output = new PdfSharpDoc();
+        foreach (var source in sources)
+        {
+            using var input = PdfReader.Open(source, PdfDocumentOpenMode.Import);
+            for (var i = 0; i < input.PageCount; i++)
+                output.AddPage(input.Pages[i]);
+        }
+        output.Save(outputPath);
     }
 }
 
