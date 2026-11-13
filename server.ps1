@@ -45,7 +45,22 @@ try {
       $bodyBytes = [byte[]]::new($contentLength)
       $offset = 0
       while ($offset -lt $contentLength) { $n = $stream.Read($bodyBytes,$offset,$contentLength-$offset); if ($n -le 0) { break }; $offset += $n }
-      if ($method -eq 'GET' -and $path -eq '/api/data') {
+      if ($method -eq 'GET' -and $path -eq '/api/official-tariffs/2026') {
+      try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $pdfUrl = 'https://ms.hmb.gov.tr/uploads/2026/01/EK-1-2-9611941dfe107036.pdf'
+        $client = [System.Net.WebClient]::new()
+        $client.Headers.Add('User-Agent','GiyimYardimiProgrami/1.0')
+        $pdfBytes = $client.DownloadData($pdfUrl)
+        if ($pdfBytes.Length -lt 5000 -or [System.Text.Encoding]::ASCII.GetString($pdfBytes,0,5) -ne '%PDF-') { throw 'Bakanliktan gecerli PDF alinmadi.' }
+        Send-Response $stream 200 'OK' 'application/pdf' $pdfBytes
+      } catch {
+        $message = [System.Text.Encoding]::UTF8.GetBytes('{"error":"official_pdf_unavailable"}')
+        Send-Response $stream 502 'Bad Gateway' 'application/json; charset=utf-8' $message
+      } finally {
+        if ($client) { $client.Dispose() }
+      }
+      } elseif ($method -eq 'GET' -and $path -eq '/api/data') {
       $bytes = [System.IO.File]::ReadAllBytes($dataFile)
       Send-Response $stream 200 'OK' 'application/json; charset=utf-8' $bytes
       } elseif ($method -eq 'POST' -and $path -eq '/api/data') {
