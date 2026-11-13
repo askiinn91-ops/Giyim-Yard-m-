@@ -7,6 +7,7 @@
 - Ayni/nakdi yardım hesaplama, kullanım süresi ve önceki ödeme kontrolü
 - Resmî çıktılar: **Harcama Talimatı** (dikey A4) ve **Dağıtım Listesi** (yatay A4) PDF
 - CSV içe aktarma, yedek alma/yükleme
+- Otomatik yedekleme (her kayıttan önce son 20 kopya + 30 günlük günlük yedek), bozuk veri dosyasından kurtarma ve tek örnek kilidi
 
 Tek bir `.exe` olarak yayımlanır; veriler `%LOCALAPPDATA%\GiyimYardimi\veriler.json` içinde tutulur. Arayüz için Microsoft Edge WebView2 Runtime gerekir.
 

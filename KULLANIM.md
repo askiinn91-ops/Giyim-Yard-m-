@@ -24,3 +24,18 @@ PDF aktarımı metin katmanı bulunan Bakanlık PDF'lerini okur; taranmış gör
 - Bütçe tertibi, ödenek ve imza yetkilisi bilgileri kurum tarafından doğrulanıp girilmelidir. Uygulama bu bilgileri kendisi belirlemez.
 - Aynı kurum ve yıl için tek kayıtlı liste oluşturulur. Listeyi kaydetmeden önce personel, kalem, tür, miktar ve harcama talimatı bilgilerini kontrol edin.
 - PDF oluşturma özelliği Windows masaüstü klasörüne yazar. Masaüstü OneDrive'a yönlendirilmişse dosyalar o konumdaki masaüstüne kaydedilir.
+
+## Veri güvenliği ve yedekler
+
+Uygulama, veri dosyasını `%LOCALAPPDATA%\GiyimYardimi\veriler.json` içinde tutar ve her kayıttan önce otomatik yedek alır:
+
+- `yedekler\otomatik\` — son 20 kayıt öncesi kopya (saniye hassasiyetinde)
+- `yedekler\gunluk\` — günlük kopya, son 30 gün
+- `yedekler\veriler-BOZUK-*.json` — açılışta okunamayan dosyalar buraya taşınır
+
+Yedekler sayfasındaki **Yedek klasörü** düğmesi bu klasörü açar. Bir yedeği geri yüklemek için ilgili `.json` dosyasını **Yedek yükle** ile seçin.
+
+Veri dosyası açılışta okunamazsa uygulama en son geçerli otomatik yedeği kendiliğinden geri yükler ve hangi dosyadan döndüğünü bildirir.
+
+Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip kapanır. Böylece iki pencerenin aynı veri dosyasına yazması engellenir.
+

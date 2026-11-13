@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Globalization;
@@ -16,12 +17,28 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
+        // Aynı anda iki kopya açılırsa aynı veri dosyasına yazan iki sunucu olur; bunu engelle.
+        using var singleInstance = new Mutex(true, @"Local\GiyimYardimi.TekKopya", out var isFirstInstance);
+        if (!isFirstInstance)
+        {
+            MessageBox.Show(
+                "Giyim Yardımı Yönetimi bu bilgisayarda zaten açık.\n\n"
+                + "Aynı anda iki kopya açıldığında veri dosyası bozulabilir. Açık olan pencereyi kullanın.",
+                "Giyim Yardımı Yönetimi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
-        var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GiyimYardimi");
+        // Test veya ikinci bir çalışma kopyası için veri klasörü ortam değişkeniyle değiştirilebilir.
+        var dataRoot = Environment.GetEnvironmentVariable("GIYIM_YARDIMI_DATA");
+        if (string.IsNullOrWhiteSpace(dataRoot))
+            dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "GiyimYardimi");
         Directory.CreateDirectory(dataRoot);
         using var server = new LocalServer(Path.Combine(dataRoot, "veriler.json"));
         server.Start();
-        Application.Run(new MainForm(server.Address, Path.Combine(dataRoot, "WebView2")));
+        if (!string.IsNullOrEmpty(server.StartupNotice))
+            MessageBox.Show(server.StartupNotice, "Giyim Yardımı Yönetimi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        Application.Run(new MainForm(server.Address, Path.Combine(dataRoot, "WebView2"), server.BackupRoot));
     }
 }
 
@@ -30,11 +47,13 @@ internal sealed class MainForm : Form
     private readonly WebView2 _web = new();
     private readonly string _address;
     private readonly string _webViewData;
+    private readonly string _backupRoot;
 
-    public MainForm(string address, string webViewData)
+    public MainForm(string address, string webViewData, string backupRoot)
     {
         _address = address;
         _webViewData = webViewData;
+        _backupRoot = backupRoot;
         Text = "Giyim Yardımı Yönetimi";
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(900, 620);
@@ -78,6 +97,16 @@ internal sealed class MainForm : Form
         {
             using var doc = JsonDocument.Parse(message);
             if (!doc.RootElement.TryGetProperty("type", out var type)) return;
+            if (type.GetString() == "openBackupFolder")
+            {
+                try
+                {
+                    Directory.CreateDirectory(_backupRoot);
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_backupRoot}\"") { UseShellExecute = true });
+                }
+                catch { }
+                return;
+            }
             if (type.GetString() == "importTariffPdf")
             {
                 await ImportTariffPdfAsync();
@@ -288,11 +317,16 @@ internal sealed record PdfTariffRow(int RowNumber, string Item, decimal Amount);
 
 internal sealed class LocalServer : IDisposable
 {
+    private const int MaxAutoBackups = 20;
+    private const int MaxDailyBackups = 30;
+
     private readonly TcpListener _listener = new(IPAddress.Loopback, 0);
     private readonly string _dataFile;
+    private readonly string _backupRoot;
     private readonly CancellationTokenSource _stop = new();
     private Task? _loop;
     private static readonly byte[] InitialData = Encoding.UTF8.GetBytes("{\"institutions\":[],\"staff\":[],\"tariffs\":[],\"years\":[],\"batches\":[]}");
+    private static readonly string[] RequiredCollections = ["institutions", "staff", "tariffs", "years", "batches"];
     private static readonly Dictionary<string, string> MimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
         [".html"] = "text/html; charset=utf-8",
@@ -301,15 +335,109 @@ internal sealed class LocalServer : IDisposable
     };
 
     public string Address { get; private set; } = "";
+    public string BackupRoot => _backupRoot;
+    public string? StartupNotice { get; private set; }
 
-    public LocalServer(string dataFile) => _dataFile = dataFile;
+    public LocalServer(string dataFile)
+    {
+        _dataFile = dataFile;
+        _backupRoot = Path.Combine(Path.GetDirectoryName(dataFile) ?? ".", "yedekler");
+    }
 
     public void Start()
     {
         _listener.Start();
         Address = $"http://127.0.0.1:{((IPEndPoint)_listener.LocalEndpoint).Port}/";
-        if (!File.Exists(_dataFile)) File.WriteAllBytes(_dataFile, InitialData);
+        PrepareDataFile();
         _loop = Task.Run(AcceptLoop);
+    }
+
+    /// <summary>Veri dosyasını doğrular; bozuksa son geçerli yedeğe döner.</summary>
+    private void PrepareDataFile()
+    {
+        try { Directory.CreateDirectory(_backupRoot); } catch { }
+
+        if (!File.Exists(_dataFile))
+        {
+            File.WriteAllBytes(_dataFile, InitialData);
+            return;
+        }
+        if (IsValidDataFile(_dataFile)) return;
+
+        var brokenName = Path.Combine(_backupRoot, $"veriler-BOZUK-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        try { File.Move(_dataFile, brokenName, true); } catch { }
+
+        var restored = Directory.GetFiles(_backupRoot, "veriler-*.json", SearchOption.AllDirectories)
+            .Where(path => !Path.GetFileName(path).StartsWith("veriler-BOZUK-", StringComparison.Ordinal))
+            .Where(IsValidDataFile)
+            .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        if (restored is not null)
+        {
+            File.Copy(restored, _dataFile, true);
+            StartupNotice = "Veri dosyası okunamadığı için son geçerli yedek geri yüklendi.\n\n"
+                + $"Geri yüklenen yedek: {Path.GetFileName(restored)}\n"
+                + $"Bozuk dosya: {Path.GetFileName(brokenName)}\n\n"
+                + "Kayıtları kontrol edip yeniden yedek almanız önerilir.";
+            return;
+        }
+
+        File.WriteAllBytes(_dataFile, InitialData);
+        StartupNotice = "Veri dosyası okunamadı ve kullanılabilir yedek bulunamadı. Boş bir veri dosyası oluşturuldu.\n\n"
+            + $"Bozuk dosya: {Path.GetFileName(brokenName)}\nKlasör: {_backupRoot}";
+    }
+
+    private static bool IsValidDataFile(string path)
+    {
+        try
+        {
+            using var stream = File.OpenRead(path);
+            using var doc = JsonDocument.Parse(stream);
+            foreach (var key in RequiredCollections)
+                if (!doc.RootElement.TryGetProperty(key, out var value) || value.ValueKind != JsonValueKind.Array)
+                    return false;
+            return true;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Her kayıttan önce dönüşümlü yedek alır: son 20 kayıt + 30 günlük günlük kopya.</summary>
+    private void BackupCurrent()
+    {
+        try
+        {
+            if (!File.Exists(_dataFile)) return;
+            var now = DateTime.Now;
+
+            var autoFolder = Path.Combine(_backupRoot, "otomatik");
+            Directory.CreateDirectory(autoFolder);
+            var snapshot = Path.Combine(autoFolder, $"veriler-{now:yyyyMMdd-HHmmss}.json");
+            var suffix = 1;
+            while (File.Exists(snapshot))
+                snapshot = Path.Combine(autoFolder, $"veriler-{now:yyyyMMdd-HHmmss}-{suffix++}.json");
+            File.Copy(_dataFile, snapshot, false);
+            TrimFolder(autoFolder, MaxAutoBackups);
+
+            var dailyFolder = Path.Combine(_backupRoot, "gunluk");
+            Directory.CreateDirectory(dailyFolder);
+            File.Copy(_dataFile, Path.Combine(dailyFolder, $"veriler-{now:yyyyMMdd}.json"), true);
+            TrimFolder(dailyFolder, MaxDailyBackups);
+        }
+        catch
+        {
+            // Yedek alınamaması kayıt işlemini engellemez.
+        }
+    }
+
+    private static void TrimFolder(string folder, int keep)
+    {
+        foreach (var old in Directory.GetFiles(folder, "veriler-*.json")
+                     .OrderByDescending(path => Path.GetFileName(path), StringComparer.Ordinal)
+                     .Skip(keep))
+        {
+            try { File.Delete(old); } catch { }
+        }
     }
 
     private async Task AcceptLoop()
@@ -375,9 +503,10 @@ internal sealed class LocalServer : IDisposable
                 {
                     var json = Encoding.UTF8.GetString(body, 0, read);
                     using var doc = JsonDocument.Parse(json);
-                    foreach (var key in new[] { "institutions", "staff", "tariffs", "years", "batches" })
+                    foreach (var key in RequiredCollections)
                         if (!doc.RootElement.TryGetProperty(key, out var value) || value.ValueKind != JsonValueKind.Array)
                             throw new InvalidDataException("Unexpected data format");
+                    BackupCurrent();
                     var temp = _dataFile + ".tmp";
                     await File.WriteAllTextAsync(temp, json, new UTF8Encoding(false));
                     File.Move(temp, _dataFile, true);
