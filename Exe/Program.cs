@@ -8,8 +8,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using PdfSharpCore.Pdf.IO;
-using PdfSharpDoc = PdfSharpCore.Pdf.PdfDocument;
 using UglyToad.PdfPig;
 
 namespace GiyimYardimi;
@@ -121,45 +119,46 @@ internal sealed class MainForm : Form
                 return;
             }
             if (type.GetString() != "exportPdf") return;
+            if (type.GetString() != "exportPdf") return;
             var year = doc.RootElement.TryGetProperty("year", out var yearNode) && yearNode.TryGetInt32(out var y) ? y : DateTime.Now.Year;
             var institution = doc.RootElement.TryGetProperty("institution", out var institutionNode) ? institutionNode.GetString() ?? "Kurum" : "Kurum";
             var batchId = doc.RootElement.TryGetProperty("batchId", out var batchNode) ? batchNode.GetString() ?? "" : "";
+            var docKind = doc.RootElement.TryGetProperty("doc", out var docNode) ? docNode.GetString() ?? "talimat" : "talimat";
             var safeInstitution = new string(institution.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray()).Trim().TrimEnd('.');
             if (string.IsNullOrWhiteSpace(safeInstitution)) safeInstitution = "Kurum";
             var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Giyim Yardımı Çıktıları");
             Directory.CreateDirectory(folder);
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var finalPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}.pdf");
-            var workFolder = Path.Combine(Path.GetTempPath(), "GiyimYardimi");
-            Directory.CreateDirectory(workFolder);
-            var talimatPath = Path.Combine(workFolder, $"talimat_{stamp}.pdf");
-            var dagitimPath = Path.Combine(workFolder, $"dagitim_{stamp}.pdf");
             try
             {
-                await _web.CoreWebView2.ExecuteScriptAsync("document.body.dataset.exportPage='talimat'");
-                var portrait = _web.CoreWebView2.Environment.CreatePrintSettings();
-                portrait.ShouldPrintBackgrounds = true;
-                portrait.ShouldPrintHeaderAndFooter = false;
-                portrait.MediaSize = CoreWebView2PrintMediaSize.Custom;
-                portrait.PageWidth = 8.27;
-                portrait.PageHeight = 11.69;
-                portrait.Orientation = CoreWebView2PrintOrientation.Portrait;
-                portrait.MarginTop = portrait.MarginBottom = portrait.MarginLeft = portrait.MarginRight = 0;
-                if (!await _web.CoreWebView2.PrintToPdfAsync(talimatPath))
-                    throw new InvalidOperationException("Harcama talimatı PDF'si oluşturulamadı.");
+                string savedPath;
+                if (string.Equals(docKind, "liste", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Dağıtım listesi: yatay A4 olarak doğrudan PDF'e çizilir.
+                    savedPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_DagitimListesi.pdf");
+                    if (string.IsNullOrWhiteSpace(batchId))
+                        throw new InvalidOperationException("Ödeme kaydı bilgisi bulunamadı.");
+                    if (!DistributionPdfWriter.TryCreate(savedPath, batchId, _dataFile, out var distributionError))
+                        throw new InvalidOperationException("Dağıtım listesi oluşturulamadı: " + distributionError);
+                }
+                else
+                {
+                    // Harcama talimatı: dikey A4 olarak WebView2'den basılır.
+                    savedPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_HarcamaTalimati.pdf");
+                    await _web.CoreWebView2.ExecuteScriptAsync("document.body.dataset.exportPage='talimat'");
+                    var portrait = _web.CoreWebView2.Environment.CreatePrintSettings();
+                    portrait.ShouldPrintBackgrounds = true;
+                    portrait.ShouldPrintHeaderAndFooter = false;
+                    portrait.MediaSize = CoreWebView2PrintMediaSize.Custom;
+                    portrait.PageWidth = 8.27;
+                    portrait.PageHeight = 11.69;
+                    portrait.Orientation = CoreWebView2PrintOrientation.Portrait;
+                    portrait.MarginTop = portrait.MarginBottom = portrait.MarginLeft = portrait.MarginRight = 0;
+                    if (!await _web.CoreWebView2.PrintToPdfAsync(savedPath))
+                        throw new InvalidOperationException("Harcama talimatı PDF'si oluşturulamadı.");
+                }
 
-                await _web.CoreWebView2.ExecuteScriptAsync("delete document.body.dataset.exportPage");
-                if (string.IsNullOrWhiteSpace(batchId))
-                    throw new InvalidOperationException("Ödeme kaydı bilgisi bulunamadı.");
-                if (!DistributionPdfWriter.TryCreate(dagitimPath, batchId, _dataFile, out var distributionError))
-                    throw new InvalidOperationException("Dağıtım listesi oluşturulamadı: " + distributionError);
-
-
-                PdfMerger.Merge(finalPath, talimatPath, dagitimPath);
-                try { File.Delete(talimatPath); } catch { }
-                try { File.Delete(dagitimPath); } catch { }
-
-                var callback = "window.pdfSaved&&window.pdfSaved(" + JsonSerializer.Serialize(new[] { finalPath }) + ")";
+                var callback = "window.pdfSaved&&window.pdfSaved(" + JsonSerializer.Serialize(new[] { savedPath }) + ")";
                 await _web.CoreWebView2.ExecuteScriptAsync(callback);
             }
             finally
@@ -183,8 +182,10 @@ internal sealed class MainForm : Form
             var idJson = await _web.CoreWebView2.ExecuteScriptAsync("db.batches[db.batches.length-1].id");
             await _web.CoreWebView2.ExecuteScriptAsync("viewBatch(db.batches[db.batches.length-1].id)");
             await Task.Delay(1500);
-            await HandleWebMessage($"{{\"type\":\"exportPdf\",\"year\":2026,\"institution\":\"Test\",\"batchId\":{idJson}}}");
-            await Task.Delay(3000);
+            await HandleWebMessage($"{{\"type\":\"exportPdf\",\"doc\":\"talimat\",\"year\":2026,\"institution\":\"Test\",\"batchId\":{idJson}}}");
+            await Task.Delay(2000);
+            await HandleWebMessage($"{{\"type\":\"exportPdf\",\"doc\":\"liste\",\"year\":2026,\"institution\":\"Test\",\"batchId\":{idJson}}}");
+            await Task.Delay(2500);
         }
         catch { }
         finally { BeginInvoke(new Action(Close)); }
@@ -212,22 +213,6 @@ internal sealed class MainForm : Form
             var script = "window.pdfImportFailed&&window.pdfImportFailed(" + JsonSerializer.Serialize(ex.Message) + ")";
             await _web.CoreWebView2.ExecuteScriptAsync(script);
         }
-    }
-}
-
-/// <summary>Ayrı üretilen harcama talimatı ve dağıtım listesi sayfalarını tek PDF dosyasında birleştirir.</summary>
-internal static class PdfMerger
-{
-    public static void Merge(string outputPath, params string[] sources)
-    {
-        using var output = new PdfSharpDoc();
-        foreach (var source in sources)
-        {
-            using var input = PdfReader.Open(source, PdfDocumentOpenMode.Import);
-            for (var i = 0; i < input.PageCount; i++)
-                output.AddPage(input.Pages[i]);
-        }
-        output.Save(outputPath);
     }
 }
 

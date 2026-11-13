@@ -68,3 +68,9 @@ Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip
 - Dağıtım listesinde imza sırası: solda **Onaylayan**, ortada **Kontrol Eden**, sağda **Düzenleyen**.
 - Dağıtım listesi artık doğrudan **yatay A4** olarak üretilir (HTML baskı yerine PDF çizimi).
 - İki belge tek PDF dosyasında birleştirilir.
+### 1.6.0
+
+- "Bu ödemeyi kaydet" artık **doğrudan kaydeder**; harcama talimatı bilgileri penceresi açılmaz.
+- Seçim özetinde **kişi bilgileri tek satırda gruplanır** (kişi toplamı ayrı sütunda).
+- Belge listesinde **Talimat PDF** ve **Liste PDF** olmak üzere iki ayrı düğme vardır.
+- PDF'ler artık birleştirilmez: **harcama talimatı dikey A4**, **dağıtım listesi yatay A4** olarak ayrı ayrı kaydedilir.
