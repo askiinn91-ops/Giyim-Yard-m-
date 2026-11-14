@@ -119,7 +119,6 @@ internal sealed class MainForm : Form
                 return;
             }
             if (type.GetString() != "exportPdf") return;
-            if (type.GetString() != "exportPdf") return;
             var year = doc.RootElement.TryGetProperty("year", out var yearNode) && yearNode.TryGetInt32(out var y) ? y : DateTime.Now.Year;
             var institution = doc.RootElement.TryGetProperty("institution", out var institutionNode) ? institutionNode.GetString() ?? "Kurum" : "Kurum";
             var batchId = doc.RootElement.TryGetProperty("batchId", out var batchNode) ? batchNode.GetString() ?? "" : "";
@@ -131,39 +130,32 @@ internal sealed class MainForm : Form
             var stamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             try
             {
+                if (string.IsNullOrWhiteSpace(batchId))
+                    throw new InvalidOperationException("Ödeme kaydı bilgisi bulunamadı.");
+
                 string savedPath;
                 if (string.Equals(docKind, "liste", StringComparison.OrdinalIgnoreCase))
                 {
                     // Dağıtım listesi: yatay A4 olarak doğrudan PDF'e çizilir.
                     savedPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_DagitimListesi.pdf");
-                    if (string.IsNullOrWhiteSpace(batchId))
-                        throw new InvalidOperationException("Ödeme kaydı bilgisi bulunamadı.");
                     if (!DistributionPdfWriter.TryCreate(savedPath, batchId, _dataFile, out var distributionError))
                         throw new InvalidOperationException("Dağıtım listesi oluşturulamadı: " + distributionError);
                 }
                 else
                 {
-                    // Harcama talimatı: dikey A4 olarak WebView2'den basılır.
+                    // Harcama talimatı: resmî Ek-1 biçiminde dikey A4 olarak doğrudan PDF'e çizilir.
                     savedPath = Path.Combine(folder, $"Giyecek_{year}_{safeInstitution}_{stamp}_HarcamaTalimati.pdf");
-                    await _web.CoreWebView2.ExecuteScriptAsync("document.body.dataset.exportPage='talimat'");
-                    var portrait = _web.CoreWebView2.Environment.CreatePrintSettings();
-                    portrait.ShouldPrintBackgrounds = true;
-                    portrait.ShouldPrintHeaderAndFooter = false;
-                    portrait.MediaSize = CoreWebView2PrintMediaSize.Custom;
-                    portrait.PageWidth = 8.27;
-                    portrait.PageHeight = 11.69;
-                    portrait.Orientation = CoreWebView2PrintOrientation.Portrait;
-                    portrait.MarginTop = portrait.MarginBottom = portrait.MarginLeft = portrait.MarginRight = 0;
-                    if (!await _web.CoreWebView2.PrintToPdfAsync(savedPath))
-                        throw new InvalidOperationException("Harcama talimatı PDF'si oluşturulamadı.");
+                    if (!TalimatPdfWriter.TryCreate(savedPath, batchId, _dataFile, out var talimatError))
+                        throw new InvalidOperationException("Harcama talimatı oluşturulamadı: " + talimatError);
                 }
 
                 var callback = "window.pdfSaved&&window.pdfSaved(" + JsonSerializer.Serialize(new[] { savedPath }) + ")";
                 await _web.CoreWebView2.ExecuteScriptAsync(callback);
             }
-            finally
+            catch (Exception ex)
             {
-                await _web.CoreWebView2.ExecuteScriptAsync("delete document.body.dataset.exportPage");
+                var callback = "window.pdfFailed&&window.pdfFailed(" + JsonSerializer.Serialize(ex.Message) + ")";
+                try { await _web.CoreWebView2.ExecuteScriptAsync(callback); } catch { }
             }
         }
         catch (Exception ex)

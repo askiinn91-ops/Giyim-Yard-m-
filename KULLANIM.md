@@ -74,3 +74,10 @@ Aynı anda yalnızca bir kopya açılabilir; ikinci kez açılırsa uyarı verip
 - Seçim özetinde **kişi bilgileri tek satırda gruplanır** (kişi toplamı ayrı sütunda).
 - Belge listesinde **Talimat PDF** ve **Liste PDF** olmak üzere iki ayrı düğme vardır.
 - PDF'ler artık birleştirilmez: **harcama talimatı dikey A4**, **dağıtım listesi yatay A4** olarak ayrı ayrı kaydedilir.
+### 1.7.0
+
+- İki belge de artık tarayıcı yazdırması yerine **doğrudan A4 PDF çizimiyle** üretilir; kâğıt boyutu Mektup (Letter) yerine kesin **A4**'tür.
+- **Harcama talimatı** resmî **Ek-1** düzenine göre dikey A4 çizilir: başlık, sayı/tarih, birim, makam, "Yapılacak Harcamanın" şeridi, tüm alanlar, açıklama kutusu ve imza blokları. "O L U R" ve imza başlıkları resmî formdaki gibi hizalanır.
+- **Dağıtım listesi** resmî sütunlarla üretilir: Sıra · Adı Soyadı · Unvanı · Hizmet Sınıfı · Giyim Eşyası · Tür · Adet · Brüt · Damga Vergisi · Net. Başlıkta T.C. / Kaymakamlık / İlçe Millî Eğitim Müdürlüğü yer alır.
+- Liste çok satırlı olduğunda **sayfalanır**; her sayfada başlık yinelenir, son sayfada **TOPLAM** satırı ve üç imza bloğu bulunur. Sığmayan satırlar sessizce atılmaz.
+- Nakdi ödemelerde yıl ayarlarındaki **gelir vergisi** ve **damga vergisi** oranları uygulanır; satır bazında kesinti ve **net tutar** hesaplanıp kaydedilir. Ayni yardımda kesinti yapılmaz. Liste toplamı net tutarları yansıtır.

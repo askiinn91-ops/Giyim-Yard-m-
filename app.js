@@ -35,6 +35,14 @@ function districtUnit(){
   const i=db.institutions.find(x=>instCategory(x)==='İlçe Millî Eğitim Müdürlüğü');
   return i?i.name:'Sivaslı İlçe Millî Eğitim Müdürlüğü';
 }
+// "Sivaslı İlçe Millî Eğitim Müdürlüğü" → "SİVASLI KAYMAKAMLIĞI" (PDF ile aynı kural)
+function kaymakamlikName(unit){
+  const upper=String(unit||'').toLocaleUpperCase('tr');
+  const i=upper.indexOf('İLÇE');
+  let district=i>0?upper.slice(0,i).trim():'';
+  if(!district)district=upper.split(/\s+/)[0]||'';
+  return district?`${district} KAYMAKAMLIĞI`:'';
+}
 
 function institutionsPage(){
   const counts={};INST_TYPES.forEach(t=>counts[t]=0);
@@ -284,6 +292,9 @@ function calculate(){
   const yr=Number(activeYear),inst=selectedInstitution;
   if(!inst){toast('Ödeme döneminde kurum seçin.');return}
   if(!priceRows(yr).length){toast('Önce seçilen yılın Yıllık Fiyat Listesini doldurun.');return}
+  const yrRow=db.years.find(x=>Number(x.year)===yr)||{};
+  const incRate=Math.max(0,Math.min(100,Number(yrRow.incomeTax)||0));
+  const stampRate=Math.max(0,Math.min(100,Number(yrRow.stampTax)||0));
   const people=db.staff.filter(s=>s.institutionId===inst&&s.active!==false),due=[];
   for(const s of people){
     const selection=window.paymentSelection?.[s.id];
@@ -293,7 +304,11 @@ function calculate(){
       const t=priceFor(item,pick.mode,yr),qty=Math.max(1,Number(pick.quantity)||1);
       if(!t){toast(`${item} için ${pick.mode} fiyatı tanımlı değil.`);return}
       const amount=Math.round(Number(t.amount)*qty*100)/100;
-      due.push({staffId:s.id,staffName:s.name,title:s.title,serviceClass:s.serviceClass||'',item,mode:pick.mode,quantity:qty,unitPrice:Number(t.amount),amount,years:Number(t.years)||0,year:yr,incomeTax:0,stampTax:0,net:amount});
+      // Ayni yardımda kesinti olmaz; nakdi tutara yıl ayarlarındaki oranlar uygulanır.
+      const incomeTax=pick.mode==='Ayni'?0:Math.round(amount*incRate)/100;
+      const stampTax=pick.mode==='Ayni'?0:Math.round(amount*stampRate)/100;
+      const net=Math.round((amount-incomeTax-stampTax)*100)/100;
+      due.push({staffId:s.id,staffName:s.name,title:s.title,serviceClass:s.serviceClass||'',item,mode:pick.mode,quantity:qty,unitPrice:Number(t.amount),amount,years:Number(t.years)||0,year:yr,incomeTax,stampTax,net});
     }
   }
   if(!due.length){toast('En az bir personel ve giyecek kalemi seçin.');return}
@@ -334,8 +349,8 @@ async function saveBatch(){
   const batch={
     id:id(),year:p.yr,institutionId:p.inst,date:new Date().toISOString().slice(0,10),number:'1',
     details,
-    totalGross:details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+x.amount,0),
-    totalNet:details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+x.amount,0),
+    totalGross:details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+Number(x.amount||0),0),
+    totalNet:details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+Number(x.net??x.amount??0),0),
     totalAyni:details.filter(x=>x.mode==='Ayni').reduce((a,x)=>a+x.amount,0),
     harcama:{
       unit:u.name||districtUnit(),
@@ -390,9 +405,11 @@ function viewBatch(key){
     const r=people.get(x.staffId)||{name:x.staffName,title:x.title,nationalId:db.staff.find(s=>s.id===x.staffId)?.nationalId||'',details:[],total:0};
     r.details.push(x);r.total+=Number(x.amount)||0;people.set(x.staffId,r);
   }
-  const moneyTotal=b.details.reduce((a,x)=>a+Number(x.amount||0),0);
-  const cashTotal=b.details.filter(x=>x.mode!=='Ayni').reduce((a,x)=>a+Number(x.amount||0),0);
-  const ayniTotal=b.details.filter(x=>x.mode==='Ayni').reduce((a,x)=>a+Number(x.amount||0),0);
+  const kaymakamlik=kaymakamlikName(unit);
+  const grossTotal=b.details.reduce((a,x)=>a+Number(x.amount||0),0);
+  const stampTotal=b.details.reduce((a,x)=>a+Number(x.stampTax||0),0);
+  const netTotal=b.details.reduce((a,x)=>a+Number(x.net??x.amount??0),0);
+  const distributionRows=b.details.map((z,i)=>`<tr><td class="center">${i+1}</td><td>${esc(z.staffName)}</td><td>${esc(z.title||'')}</td><td>${esc(z.serviceClass||'')}</td><td>${esc(z.item)}</td><td class="center">${z.mode==='Ayni'?'Ayni':'Nakdi'}</td><td class="center">${Number(z.quantity)||1}</td><td class="money">${money(z.amount)}</td><td class="money">${money(z.stampTax||0)}</td><td class="money">${money(z.net??z.amount)}</td></tr>`).join('');
 
   const talimatRows=[
     ['Gerekçesi ve hukuki dayanağı',basis],
@@ -406,12 +423,6 @@ function viewBatch(key){
     ['Gerçekleştirme görevlileri',h.officers],
     ['Harcama Yetkilisi',h.authority]
   ];
-
-  const peopleRows=[...people.values()].map((p,i)=>{
-    const span=Math.max(1,p.details.length);
-    const head=`<td rowspan="${span}">${i+1}</td><td rowspan="${span}"><b>${esc(p.name)}</b></td><td rowspan="${span}">${esc(p.title||'')}</td><td rowspan="${span}" class="mono">${esc(p.nationalId||'')}</td>`;
-    return p.details.map((z,j)=>`<tr>${j===0?head:''}<td>${esc(z.item)}${z.mode==='Ayni'?' (AYNİ)':''}</td><td class="money">${money(z.amount)}</td><td>${Number(z.quantity)||1}</td></tr>`).join('');
-  }).join('');
 
   const sign=o=>`<p><span class="lbl">İmzası :</span><span class="val"></span></p><p><span class="lbl">Adı Soyadı :</span><span class="val">${esc(o.n||'')}</span></p><p><span class="lbl">Unvanı :</span><span class="val">${esc(o.t||'')}</span></p>`;
 
@@ -437,23 +448,23 @@ function viewBatch(key){
 </section>
 
 <section class="printPage distributionPage">
-  <div class="distributionDate">Tarih: ${dateText(b.date)}</div>
-  <h2>${esc(inst.toLocaleUpperCase('tr'))} ${b.year} GİYİM YARDIMI ÖDEMESİ</h2>
-  <table class="reporttable peopleTable">
-    <thead><tr><th>Sıra No</th><th>Adı Soyadı</th><th>Unvanı</th><th>T.C.</th><th>Yardım Adı</th><th>Tutarı</th><th>Adedi</th></tr></thead>
-    <tbody>${peopleRows}</tbody>
-  </table>
-  <div class="distributionTotal">
-    <span>Kişi sayısı: <b>${people.size}</b></span>
-    <span>Kalem sayısı: <b>${b.details.length}</b></span>
-    <span>Nakdi: <b>${money(cashTotal)}</b></span>
-    <span>Ayni: <b>${money(ayniTotal)}</b></span>
-    <span class="grand">GENEL TOPLAM: <b>${money(moneyTotal)}</b></span>
+  <div class="distributionHead">
+    <div class="tc">T.C.</div>
+    ${kaymakamlik?`<div class="kaymakamlik">${esc(kaymakamlik)}</div>`:''}
+    <div class="unit">${esc(unit.toLocaleUpperCase('tr'))}</div>
+    <h2>GİYİM YARDIMI LİSTESİ</h2>
   </div>
+  <div class="distributionMeta"><span>Kurum: ${esc(inst)}</span><span>Yıl: ${b.year}</span><span>Tarih: ${dateText(b.date)}</span><span>Personel: ${people.size}</span></div>
+  <table class="reporttable officialList">
+    <colgroup><col style="width:4%"><col style="width:15%"><col style="width:11%"><col style="width:14%"><col style="width:21%"><col style="width:8%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:7%"></colgroup>
+    <thead><tr><th>Sıra</th><th>Adı Soyadı</th><th>Unvanı</th><th>Hizmet Sınıfı</th><th>Giyim Eşyası</th><th>Tür</th><th>Adet</th><th>Brüt Tutar (TL)</th><th>Damga Vergisi (TL)</th><th>Net Tutar (TL)</th></tr></thead>
+    <tbody>${distributionRows}</tbody>
+    <tfoot><tr class="distributionTotalRow"><td colspan="7" style="text-align:right">TOPLAM</td><td class="money">${money(grossTotal)}</td><td class="money">${money(stampTotal)}</td><td class="money">${money(netTotal)}</td></tr></tfoot>
+  </table>
   <div class="distributionSignatures">
-    <div><b>Onaylayan</b><span>${esc(authorityName)}</span><span>${esc(authorityTitle)}</span></div>
-    <div><b>Kontrol Eden</b><span>${esc(proposedName)}</span><span>${esc(proposedTitle)}</span></div>
     <div><b>Düzenleyen</b><span>${esc(editorName)}</span><span>${esc(editorTitle)}</span></div>
+    <div><b>Kontrol eden</b><span>${esc(proposedName)}</span><span>${esc(proposedTitle)}</span></div>
+    <div><b>Onaylayan</b><span>${esc(authorityName)}</span><span>${esc(authorityTitle)}</span></div>
   </div>
 </section>
 

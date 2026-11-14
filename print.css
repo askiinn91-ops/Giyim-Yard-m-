@@ -134,3 +134,25 @@ h1,h2,.brand b,.stat strong{font-family:"Segoe UI",Arial,sans-serif}
   #printArea .instructionPage{page:talimatSayfa}
   #printArea .distributionPage{page:dagitimSayfa}
 }
+
+/* v1.7.0: resmî dağıtım listesi görünümü (ekranda ve yazdırmada PDF ile aynı sütunlar) */
+#printArea .distributionHead{text-align:center;margin:0 0 6px}
+#printArea .distributionHead>div{font:700 10pt Arial,sans-serif;letter-spacing:.2px}
+#printArea .distributionHead>div.tc{font-size:9pt}
+#printArea .distributionHead h2{font:700 12pt Arial,sans-serif;margin:6px 0 0;text-align:center}
+#printArea .distributionMeta{display:flex;flex-wrap:wrap;gap:2px 18px;font:8.5pt Arial,sans-serif;margin:0 0 8px}
+#printArea .officialList{width:100%;table-layout:fixed;border-collapse:collapse}
+#printArea .officialList th,#printArea .officialList td{border:1px solid #333;padding:4px 5px;font:8.5pt Arial,sans-serif;text-align:left;vertical-align:middle;white-space:normal}
+#printArea .officialList thead th{background:#eee;color:#111;text-align:center;font-weight:700}
+#printArea .officialList tbody td.center{text-align:center}
+#printArea .officialList tbody td.money,#printArea .officialList tfoot td.money{text-align:right;white-space:nowrap}
+#printArea .officialList tfoot tr.distributionTotalRow td{font-weight:700;background:#f4f6f5}
+@media print{
+  #printArea .officialList th,#printArea .officialList td{font:7.5pt Arial,sans-serif;padding:1.2mm 1mm}
+  #printArea .distributionHead{margin:0 0 3mm}
+  #printArea .distributionHead>div{font:bold 10pt Arial,sans-serif}
+  #printArea .distributionMeta{margin:0 0 3mm;font:8pt Arial,sans-serif}
+  #printArea .officialList{page-break-inside:auto}
+  #printArea .officialList tr{page-break-inside:avoid}
+  #printArea .officialList thead{display:table-header-group}
+}

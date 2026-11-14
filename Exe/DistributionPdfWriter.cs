@@ -1,31 +1,34 @@
-using System.Globalization;
-using System.Text.Json;
 using PdfSharpCore.Drawing;
-using PdfSharpCore.Fonts;
 using PdfSharpCore.Pdf;
 
 namespace GiyimYardimi;
 
-/// <summary>Dağıtım listesini yatay A4 olarak doğrudan PDF'e çizer.</summary>
+/// <summary>
+/// Giyim Yardımı Listesi'ni resmî biçimde, yatay A4 olarak doğrudan PDF'e çizer.
+/// Sütunlar: Sıra · Adı Soyadı · Unvanı · Hizmet Sınıfı · Giyim Eşyası · Tür · Adet · Brüt · Damga · Net
+/// </summary>
 internal static class DistributionPdfWriter
 {
-    private static bool _fontReady;
+    private const double PageWidthMm = 297;
+    private const double PageHeightMm = 210;
+    private const double MarginMm = 12;
 
-    public static void EnsureFonts()
+    // Sütun genişlikleri (mm) — toplam 273
+    private static readonly double[] Columns = { 10, 42, 36, 40, 57, 16, 12, 20, 20, 20 };
+    private static readonly string[] Headers =
     {
-        if (_fontReady) return;
-        GlobalFontSettings.FontResolver = new WindowsFontResolver();
-        _fontReady = true;
-    }
+        "Sıra", "Adı Soyadı", "Unvanı", "Hizmet Sınıfı", "Giyim Eşyası", "Tür", "Adet",
+        "Brüt Tutar (TL)", "Damga Vergisi (TL)", "Net Tutar (TL)"
+    };
 
     public static bool TryCreate(string outputPath, string batchId, string dataFile, out string? error)
     {
         error = null;
         try
         {
-            var model = DistributionModel.Load(dataFile, batchId);
+            var model = BatchDocumentModel.Load(dataFile, batchId);
             if (model is null) { error = "Ödeme kaydı bulunamadı."; return false; }
-            EnsureFonts();
+            PdfDrawing.EnsureFonts();
             Render(outputPath, model);
             return true;
         }
@@ -36,260 +39,220 @@ internal static class DistributionPdfWriter
         }
     }
 
-    private static void Render(string path, DistributionModel m)
+    private static void Render(string path, BatchDocumentModel m)
     {
         using var doc = new PdfDocument();
-        var page = doc.AddPage();
-        page.Width = XUnit.FromMillimeter(297);
-        page.Height = XUnit.FromMillimeter(210);
-        using var gfx = XGraphics.FromPdfPage(page);
-
-        var titleFont = new XFont("Arial", 11, XFontStyle.Bold);
-        var headFont = new XFont("Arial", 8, XFontStyle.Bold);
-        var bodyFont = new XFont("Arial", 8, XFontStyle.Regular);
-        var totalFont = new XFont("Arial", 9, XFontStyle.Bold);
         var black = XBrushes.Black;
+        var titleFont = new XFont("Arial", 12, XFontStyle.Bold);
+        var subTitleFont = new XFont("Arial", 10, XFontStyle.Bold);
+        var metaFont = new XFont("Arial", 8.5, XFontStyle.Regular);
+        var headFont = new XFont("Arial", 8, XFontStyle.Bold);
+        var bodyFont = new XFont("Arial", 8.5, XFontStyle.Regular);
+        var totalFont = new XFont("Arial", 9, XFontStyle.Bold);
+        var signFont = new XFont("Arial", 8, XFontStyle.Regular);
 
-        double margin = 12;
-        double width = 297 - margin * 2;
-        double y = margin;
+        double left = PdfDrawing.Mm(MarginMm);
+        double width = PdfDrawing.Mm(PageWidthMm - MarginMm * 2);
+        double right = left + width;
+        double tableWidth = Columns.Sum(PdfDrawing.Mm);
 
-        gfx.DrawString("Tarih: " + m.DateText, bodyFont, black, new XRect(margin, y, width, 6), XStringFormats.TopRight);
-        y += 9;
-        gfx.DrawString(m.Title, titleFont, black, new XRect(margin, y, width, 8), XStringFormats.TopLeft);
-        y += 10;
+        double headerHeight = PdfDrawing.Mm(9);
+        double rowHeight = PdfDrawing.Mm(5.6);
+        double tableTop = PdfDrawing.Mm(46);
+        double tableBottomFull = PdfDrawing.Mm(PageHeightMm - MarginMm - 1);
+        double tableBottomLast = PdfDrawing.Mm(PageHeightMm - MarginMm - 39);
+        double totalRowHeight = PdfDrawing.Mm(7.5);
 
-        // Sütun genişlikleri (mm)
-        double[] cols = { 12, 46, 38, 30, 78, 33, 36 };
-        double tableWidth = cols.Sum();
-        double scale = width / tableWidth;
-        for (var i = 0; i < cols.Length; i++) cols[i] *= scale;
+        // Sayfa başına satır dağılımı: sayfalar doldurulur, son sayfada imza için yer bırakılır.
+        var firstRowY = tableTop + headerHeight;
+        var perFull = Math.Max(1, (int)Math.Floor((tableBottomFull - firstRowY) / rowHeight));
+        var perLast = Math.Max(1, (int)Math.Floor((tableBottomLast - firstRowY) / rowHeight));
 
-        string[] headers = { "Sıra No", "Adı Soyadı", "Unvanı", "T.C.", "Yardım Adı", "Tutarı", "Adedi" };
-        double rowH = 6.4;
-        double headerH = 7.5;
+        var rowCounts = PlanPages(m.Rows.Count, perFull, perLast);
 
-        // Başlık satırı
-        gfx.DrawRectangle(XPens.Black, new XRect(margin, y, cols.Sum(), headerH));
-        double x = margin;
-        for (var i = 0; i < headers.Length; i++)
+        var pageIndex = 0;
+        var rowIndex = 0;
+        var totalGross = m.GrossTotal;
+        var totalStamp = m.StampTotal;
+        var totalNet = m.NetTotal;
+
+        while (rowIndex < m.Rows.Count || pageIndex == 0)
         {
-            if (i > 0) gfx.DrawLine(XPens.Black, x, y, x, y + headerH);
-            gfx.DrawString(headers[i], headFont, black, new XRect(x + 1, y + 1.8, cols[i] - 2, headerH), XStringFormats.TopCenter);
-            x += cols[i];
-        }
-        gfx.DrawLine(XPens.Black, margin, y + headerH, margin + cols.Sum(), y + headerH);
-        y += headerH;
+            var page = doc.AddPage();
+            page.Width = XUnit.FromMillimeter(PageWidthMm);
+            page.Height = XUnit.FromMillimeter(PageHeightMm);
+            using var gfx = XGraphics.FromPdfPage(page);
+            pageIndex++;
+            var pageStartRow = rowIndex;
+            var pageRowLimit = Math.Min(m.Rows.Count, pageStartRow + rowCounts[pageIndex - 1]);
 
-        var pageBottom = 210 - margin - 30; // imzalar için alt boşluk
-        var index = 0;
-        foreach (var person in m.People)
-        {
-            index++;
-            var lines = Math.Max(1, person.Items.Count);
-            var blockH = rowH * lines;
-            if (y + Math.Min(blockH, rowH * 2) > pageBottom) break;
-
-            var top = y;
-            x = margin;
-            // Birleşik hücreler (kişi bilgileri)
-            double[] mergedWidths = { cols[0], cols[1], cols[2], cols[3] };
-            string[] mergedText =
+            // --- Başlık bloğu ---
+            double y = PdfDrawing.Mm(11);
+            gfx.DrawString("T.C.", subTitleFont, black, new XRect(left, y, width, PdfDrawing.Mm(5)), XStringFormats.TopCenter);
+            y += PdfDrawing.Mm(5.5);
+            if (!string.IsNullOrWhiteSpace(m.KaymakamlikName))
             {
-                index.ToString(CultureInfo.InvariantCulture),
-                person.Name,
-                person.Title,
-                person.NationalId
-            };
-            for (var c = 0; c < 4; c++)
-            {
-                gfx.DrawRectangle(XPens.Black, new XRect(x, top, mergedWidths[c], blockH));
-                var align = c == 0 ? XStringFormats.TopCenter : XStringFormats.TopLeft;
-                gfx.DrawString(mergedText[c], bodyFont, black, new XRect(x + 1, top + (blockH - 3.2) / 2, mergedWidths[c] - 2, 4), align);
-                x += mergedWidths[c];
+                gfx.DrawString(m.KaymakamlikName.ToUpper(PdfDrawing.Tr), subTitleFont, black,
+                    new XRect(left, y, width, PdfDrawing.Mm(5)), XStringFormats.TopCenter);
+                y += PdfDrawing.Mm(5.5);
             }
-            // Yardım satırları
-            double itemX = x;
-            for (var r = 0; r < lines; r++)
+            gfx.DrawString(m.UnitName.ToUpper(PdfDrawing.Tr), subTitleFont, black,
+                new XRect(left, y, width, PdfDrawing.Mm(5)), XStringFormats.TopCenter);
+            y += PdfDrawing.Mm(6.5);
+            gfx.DrawString("GİYİM YARDIMI LİSTESİ" + (pageIndex > 1 ? " (devam)" : ""), titleFont, black,
+                new XRect(left, y, width, PdfDrawing.Mm(7)), XStringFormats.TopCenter);
+
+            // --- Künye ---
+            y = PdfDrawing.Mm(38);
+            var meta = $"Kurum: {m.InstitutionName}     Yıl: {m.Year}     Tarih: {m.DateText}     Personel: {m.PersonCount}";
+            gfx.DrawString(meta, metaFont, black, new XRect(left, y, width, PdfDrawing.Mm(5)), XStringFormats.TopLeft);
+
+            // --- Tablo başlığı ---
+            var top = tableTop;
+            gfx.DrawRectangle(XPens.Black, new XRect(left, top, tableWidth, headerHeight));
+            double x = left;
+            for (var c = 0; c < Columns.Length; c++)
             {
-                var item = person.Items[r];
-                var ry = top + r * rowH;
-                var cx = itemX;
-                var values = new[] { item.Name, item.AmountText, item.QuantityText };
-                for (var c = 4; c < 7; c++)
+                var cw = PdfDrawing.Mm(Columns[c]);
+                if (c > 0) gfx.DrawLine(XPens.Black, x, top, x, top + headerHeight);
+                var headerLines = PdfDrawing.Wrap(gfx, Headers[c], headFont, cw - PdfDrawing.Mm(2));
+                var hy = top + (headerHeight - headerLines.Count * PdfDrawing.Mm(3.4)) / 2;
+                foreach (var line in headerLines)
                 {
-                    gfx.DrawRectangle(XPens.Black, new XRect(cx, ry, cols[c], rowH));
-                    var align = c == 4 ? XStringFormats.TopLeft : XStringFormats.TopCenter;
-                    gfx.DrawString(values[c - 4], bodyFont, black, new XRect(cx + 1, ry + 2, cols[c] - 2, rowH), align);
-                    cx += cols[c];
+                    gfx.DrawString(line, headFont, black, new XRect(x, hy, cw, PdfDrawing.Mm(3.6)), XStringFormats.TopCenter);
+                    hy += PdfDrawing.Mm(3.4);
+                }
+                x += cw;
+            }
+
+            // --- Satırlar ---
+            y = top + headerHeight;
+            while (rowIndex < pageRowLimit)
+            {
+                var row = m.Rows[rowIndex];
+                rowIndex++;
+
+                gfx.DrawRectangle(XPens.Black, new XRect(left, y, tableWidth, rowHeight));
+                x = left;
+                var values = new[]
+                {
+                    rowIndex.ToString(),
+                    row.Name,
+                    row.Title,
+                    row.ServiceClass,
+                    row.Item,
+                    row.Mode == "Ayni" ? "Ayni" : "Nakdi",
+                    row.Quantity.ToString(),
+                    PdfDrawing.Money(row.Gross),
+                    PdfDrawing.Money(row.Stamp),
+                    PdfDrawing.Money(row.Net)
+                };
+
+                for (var c = 0; c < Columns.Length; c++)
+                {
+                    var cw = PdfDrawing.Mm(Columns[c]);
+                    if (c > 0) gfx.DrawLine(XPens.Black, x, y, x, y + rowHeight);
+                    var align = c >= 7 ? XStringFormats.TopRight : (c is 0 or 6 ? XStringFormats.TopCenter : XStringFormats.TopLeft);
+                    var padding = c >= 7 ? PdfDrawing.Mm(1.5) : PdfDrawing.Mm(1);
+                    var text = FitText(gfx, values[c], bodyFont, cw - PdfDrawing.Mm(2));
+                    gfx.DrawString(text, bodyFont, black,
+                        new XRect(x + padding, y + PdfDrawing.Mm(1.9), cw - PdfDrawing.Mm(2), PdfDrawing.Mm(4)), align);
+                    x += cw;
+                }
+                y += rowHeight;
+            }
+
+            var isLastPage = rowIndex >= m.Rows.Count;
+
+            // --- Toplam satırı ---
+            if (isLastPage)
+            {
+                gfx.DrawRectangle(XPens.Black, new XRect(left, y, tableWidth, totalRowHeight));
+                x = left;
+                for (var c = 0; c < Columns.Length; c++)
+                {
+                    var cw = PdfDrawing.Mm(Columns[c]);
+                    if (c > 0) gfx.DrawLine(XPens.Black, x, y, x, y + totalRowHeight);
+                    x += cw;
+                }
+                var totalLabelWidth = Columns.Take(7).Sum(PdfDrawing.Mm);
+                gfx.DrawString("TOPLAM", totalFont, black,
+                    new XRect(left + PdfDrawing.Mm(2), y + PdfDrawing.Mm(2.2), totalLabelWidth - PdfDrawing.Mm(4), PdfDrawing.Mm(4.5)),
+                    XStringFormats.TopRight);
+
+                var moneyX = left + totalLabelWidth;
+                var moneyValues = new[] { PdfDrawing.Money(totalGross), PdfDrawing.Money(totalStamp), PdfDrawing.Money(totalNet) };
+                for (var c = 7; c < Columns.Length; c++)
+                {
+                    var cw = PdfDrawing.Mm(Columns[c]);
+                    gfx.DrawString(moneyValues[c - 7], totalFont, black,
+                        new XRect(moneyX + PdfDrawing.Mm(1.5), y + PdfDrawing.Mm(2.2), cw - PdfDrawing.Mm(2), PdfDrawing.Mm(4.5)),
+                        XStringFormats.TopRight);
+                    moneyX += cw;
+                }
+                y += totalRowHeight;
+
+                // --- İmzalar ---
+                var signTop = PdfDrawing.Mm(PageHeightMm - MarginMm - 26);
+                var columnWidth = tableWidth / 3.0;
+                var labels = new[] { "Düzenleyen", "Kontrol Eden", "Onaylayan" };
+                var signers = new[] { m.Editor, m.Proposed, m.Authority };
+                for (var i = 0; i < 3; i++)
+                {
+                    var sx = left + i * columnWidth;
+                    gfx.DrawString(labels[i], totalFont, black, new XRect(sx, signTop, columnWidth, PdfDrawing.Mm(5)), XStringFormats.TopCenter);
+                    gfx.DrawString("İmzası : ........................", signFont, black, new XRect(sx, signTop + PdfDrawing.Mm(6), columnWidth, PdfDrawing.Mm(4)), XStringFormats.TopCenter);
+                    gfx.DrawString(signers[i].Name, bodyFont, black, new XRect(sx, signTop + PdfDrawing.Mm(12), columnWidth, PdfDrawing.Mm(4)), XStringFormats.TopCenter);
+                    gfx.DrawString(signers[i].Title, signFont, black, new XRect(sx, signTop + PdfDrawing.Mm(16.5), columnWidth, PdfDrawing.Mm(4)), XStringFormats.TopCenter);
                 }
             }
-            y += blockH;
-        }
 
-        // Genel toplam satırı
-        y += 6;
-        var totalText = $"Kişi sayısı: {m.People.Count}    Kalem sayısı: {m.ItemCount}    Nakdi: {m.CashText}    Ayni: {m.AyniText}    GENEL TOPLAM: {m.TotalText}";
-        gfx.DrawString(totalText, totalFont, black, new XRect(margin, y, cols.Sum(), 6), XStringFormats.TopRight);
-        y += 12;
-
-        // İmzalar: solda Onaylayan, ortada Kontrol Eden, sağda Düzenleyen
-        double signTop = 210 - margin - 26;
-        double colW = cols.Sum() / 3.0;
-        string[] labels = { "Onaylayan", "Kontrol Eden", "Düzenleyen" };
-        (string Name, string Title)[] signers = { m.Authority, m.Proposed, m.Editor };
-        for (var i = 0; i < 3; i++)
-        {
-            var sx = margin + i * colW;
-            gfx.DrawString(labels[i], totalFont, black, new XRect(sx, signTop, colW, 6), XStringFormats.TopCenter);
-            gfx.DrawString(signers[i].Name, bodyFont, black, new XRect(sx, signTop + 14, colW, 5), XStringFormats.TopCenter);
-            gfx.DrawString(signers[i].Title, bodyFont, black, new XRect(sx, signTop + 19, colW, 5), XStringFormats.TopCenter);
+            if (isLastPage) break;
         }
 
         doc.Save(path);
     }
-}
 
-internal sealed class DistributionModel
-{
-    public string Title { get; private set; } = "";
-    public string DateText { get; private set; } = "";
-    public List<PersonRow> People { get; } = [];
-    public int ItemCount { get; private set; }
-    public string CashText { get; private set; } = "";
-    public string AyniText { get; private set; } = "";
-    public string TotalText { get; private set; } = "";
-    public (string Name, string Title) Editor { get; private set; }
-    public (string Name, string Title) Proposed { get; private set; }
-    public (string Name, string Title) Authority { get; private set; }
-
-    internal sealed class PersonRow
+    /// <summary>
+    /// Sayfa başına satır sayılarını planlar: önce sayfalar tam doldurulur, son sayfa
+    /// toplam ve imza satırlarına yer bırakacak biçimde sınırlanır. Son sayfa çok az
+    /// satırla kalmışsa son iki sayfa dengelenir.
+    /// </summary>
+    private static int[] PlanPages(int rowCount, int perFull, int perLast)
     {
-        public string Name { get; init; } = "";
-        public string Title { get; init; } = "";
-        public string NationalId { get; init; } = "";
-        public List<ItemRow> Items { get; } = [];
-    }
+        if (rowCount <= 0) return [0];
 
-    internal sealed class ItemRow
-    {
-        public string Name { get; init; } = "";
-        public string AmountText { get; init; } = "";
-        public string QuantityText { get; init; } = "";
-    }
+        var pageCount = (int)Math.Ceiling(rowCount / (double)perFull);
+        while (rowCount - perFull * (pageCount - 1) > perLast) pageCount++;
 
-    public static DistributionModel? Load(string dataFile, string batchId)
-    {
-        using var doc = JsonDocument.Parse(File.ReadAllText(dataFile));
-        var root = doc.RootElement;
-        if (!root.TryGetProperty("batches", out var batches)) return null;
-
-        JsonElement? found = null;
-        foreach (var b in batches.EnumerateArray())
+        var counts = new int[pageCount];
+        var remaining = rowCount;
+        for (var i = 0; i < pageCount; i++)
         {
-            if (string.Equals(b.TryGetProperty("id", out var id) ? id.GetString() : null, batchId, StringComparison.Ordinal))
-            {
-                found = b;
-                break;
-            }
-        }
-        if (found is not { } batch) return null;
-
-        var model = new DistributionModel();
-        var tr = new CultureInfo("tr-TR");
-        var instId = batch.TryGetProperty("institutionId", out var ii) ? ii.GetString() : null;
-        var year = batch.TryGetProperty("year", out var yy) && yy.TryGetInt32(out var yv) ? yv : DateTime.Now.Year;
-        var institutionName = "KURUM";
-        var nationalIds = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        if (root.TryGetProperty("institutions", out var institutions))
-            foreach (var inst in institutions.EnumerateArray())
-            {
-                var id = inst.TryGetProperty("id", out var iid) ? iid.GetString() : null;
-                if (id == instId) institutionName = inst.TryGetProperty("name", out var nm) ? nm.GetString() ?? institutionName : institutionName;
-            }
-        if (root.TryGetProperty("staff", out var staff))
-            foreach (var s in staff.EnumerateArray())
-            {
-                var id = s.TryGetProperty("id", out var sid) ? sid.GetString() : null;
-                var tc = s.TryGetProperty("nationalId", out var nid) ? nid.GetString() : null;
-                if (id is not null && !string.IsNullOrWhiteSpace(tc)) nationalIds[id] = tc!;
-            }
-
-        model.Title = $"{institutionName.ToUpper(tr)} {year} GİYİM YARDIMI ÖDEMESİ";
-        var dateText = batch.TryGetProperty("date", out var d) ? d.GetString() : null;
-        model.DateText = DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt)
-            ? dt.ToString("dd.MM.yyyy", tr) : dateText ?? "";
-
-        decimal cash = 0, ayni = 0, total = 0;
-        var people = new Dictionary<string, PersonRow>(StringComparer.Ordinal);
-        var order = new List<string>();
-
-        if (batch.TryGetProperty("details", out var details))
-            foreach (var dz in details.EnumerateArray())
-            {
-                var staffId = dz.TryGetProperty("staffId", out var sid) ? sid.GetString() ?? "" : "";
-                var name = dz.TryGetProperty("staffName", out var nm) ? nm.GetString() ?? "" : "";
-                var title = dz.TryGetProperty("title", out var tt) ? tt.GetString() ?? "" : "";
-                var item = dz.TryGetProperty("item", out var it) ? it.GetString() ?? "" : "";
-                var mode = dz.TryGetProperty("mode", out var md) ? md.GetString() ?? "" : "";
-                var qty = dz.TryGetProperty("quantity", out var qq) && qq.TryGetInt32(out var qv) ? Math.Max(1, qv) : 1;
-                var amount = dz.TryGetProperty("amount", out var az) && az.TryGetDecimal(out var av) ? av : 0m;
-
-                if (!people.TryGetValue(staffId, out var person))
-                {
-                    person = new PersonRow { Name = name, Title = title, NationalId = nationalIds.GetValueOrDefault(staffId, "") };
-                    people[staffId] = person;
-                    order.Add(staffId);
-                }
-                if (mode == "Ayni") ayni += amount; else cash += amount;
-                total += amount;
-                model.ItemCount++;
-                person.Items.Add(new ItemRow
-                {
-                    Name = mode == "Ayni" ? item + " (AYNİ)" : item,
-                    AmountText = amount.ToString("N2", tr),
-                    QuantityText = qty.ToString(CultureInfo.InvariantCulture)
-                });
-            }
-
-        foreach (var key in order) model.People.Add(people[key]);
-
-        model.CashText = cash.ToString("N2", tr) + " TL";
-        model.AyniText = ayni.ToString("N2", tr) + " TL";
-        model.TotalText = total.ToString("N2", tr) + " TL";
-
-        // İmzacılar: Harcama Birimi menüsü, yoksa eski ayarlar
-        JsonElement settings = default;
-        var hasSettings = root.TryGetProperty("spendingUnit", out settings) && settings.ValueKind == JsonValueKind.Object;
-        if (!hasSettings) hasSettings = root.TryGetProperty("documentSettings", out settings) && settings.ValueKind == JsonValueKind.Object;
-
-        string Read(string key, string fallback = "")
-        {
-            if (!hasSettings) return fallback;
-            return settings.TryGetProperty(key, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? fallback : fallback;
+            counts[i] = Math.Min(perFull, remaining);
+            remaining -= counts[i];
         }
 
-        model.Editor = (Read("editorName"), Read("editorTitle"));
-        model.Proposed = (Read("proposedName"), Read("proposedTitle"));
-        model.Authority = (Read("authorityName"), Read("authorityTitle"));
-        return model;
+        // Son sayfa neredeyse boş kalıyorsa son iki sayfayı dengeli böl.
+        if (pageCount >= 2 && counts[^1] < perFull / 2)
+        {
+            var total = counts[^2] + counts[^1];
+            var last = Math.Min(perLast, total / 2);
+            counts[^1] = last;
+            counts[^2] = total - last;
+        }
+
+        return counts;
     }
-}
 
-internal sealed class WindowsFontResolver : IFontResolver
-{
-    public string DefaultFontName => "Arial";
-
-    public FontResolverInfo ResolveTypeface(string familyName, bool isBold, bool isItalic)
-        => new(isBold ? "Arial#b" : "Arial", isBold, false);
-
-    public byte[]? GetFont(string faceName)
+    /// <summary>Sığmayan uzun metni kısaltır (sütun genişliği sabit).</summary>
+    private static string FitText(XGraphics gfx, string text, XFont font, double maxWidth)
     {
-        var fonts = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-        var file = faceName == "Arial#b" ? "arialbd.ttf" : "arial.ttf";
-        var path = Path.Combine(fonts, file);
-        if (!File.Exists(path)) path = Path.Combine(fonts, "segoeui.ttf");
-        return File.Exists(path) ? File.ReadAllBytes(path) : null;
+        if (string.IsNullOrEmpty(text)) return "";
+        if (gfx.MeasureString(text, font).Width <= maxWidth) return text;
+        var trimmed = text;
+        while (trimmed.Length > 1 && gfx.MeasureString(trimmed + "…", font).Width > maxWidth)
+            trimmed = trimmed[..^1];
+        return trimmed.TrimEnd() + "…";
     }
 }
